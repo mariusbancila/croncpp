@@ -31,3 +31,4 @@
 *.out
 *.app
 /build/.gitignore
+/build

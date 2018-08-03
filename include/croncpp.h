@@ -32,10 +32,12 @@ namespace cron
       constexpr cron_int CRON_MAX_SECONDS = 60;
       constexpr cron_int CRON_MAX_MINUTES = 60;
       constexpr cron_int CRON_MAX_HOURS = 24;
-      constexpr cron_int CRON_MAX_DAYS_OF_WEEK = 8;
-      constexpr cron_int CRON_MAX_DAYS_OF_MONTH = 32;
+      constexpr cron_int CRON_MAX_DAYS_OF_WEEK = 7;
+      constexpr cron_int CRON_MAX_DAYS_OF_MONTH = 31;
       constexpr cron_int CRON_MAX_MONTHS = 12;
       constexpr cron_int CRON_MAX_YEARS_DIFF = 4;
+      static std::vector<std::string> DAYS = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
+      static std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
       std::vector<std::string> split(std::string_view text, char const delimiter)
       {
@@ -64,6 +66,26 @@ namespace cron
          {
             throw bad_cronexpr(ex.what());
          }
+      }
+
+      std::string to_upper(std::string text)
+      {
+         std::transform(std::begin(text), std::end(text),
+            std::begin(text), std::toupper);
+
+         return text;
+      }
+
+      std::string replace_ordinals(std::string text, std::vector<std::string> const & replacement)
+      {
+         for (size_t i = 0; i < replacement.size(); ++i)
+         {
+            auto pos = text.find(replacement[i]);
+            if (std::string::npos != pos)
+               text.replace(pos, pos+3 ,std::to_string(i));
+         }
+
+         return text;
       }
 
       static std::pair<cron_int, cron_int> make_range(
@@ -154,6 +176,55 @@ namespace cron
             }
          }
       }
+
+      static void set_cron_days_of_week(
+         std::string value,
+         std::bitset<7>& target)
+      {
+         auto days = detail::to_upper(value);
+         auto days_replaced = detail::replace_ordinals(days, DAYS);
+
+         if (days_replaced.size() == 1 && days_replaced[0] == '?')
+            days_replaced[0] = '*';
+
+         set_cron_field(days_replaced, target, 0, CRON_MAX_DAYS_OF_WEEK);
+         /*
+         if (target.test(6))
+         {
+            target.set(0);
+            target.reset(6);
+         }
+         */
+      }
+
+      static void set_cron_days_of_month(
+         std::string value,
+         std::bitset<31>& target)
+      {
+         if (value.size() == 1 && value[0] == '?')
+            value[0] = '*';
+
+         set_cron_field(value, target, 0, CRON_MAX_DAYS_OF_MONTH);
+      }
+
+      static void set_cron_month(
+         std::string value,
+         std::bitset<12>& target)
+      {
+         auto month = to_upper(value);
+         auto month_replaced = replace_ordinals(month, MONTHS);
+
+         set_cron_field(month_replaced, target, 0, CRON_MAX_MONTHS);
+         /*
+         for (int i = 0; i < CRON_MAX_MONTHS; ++i)
+         {
+            if (target.test(i))
+            {
+               target.set(i - 1);
+               target.reset(i);
+            }
+         }*/
+      }
    }
 
    cronexpr make_cron(std::string_view expr)
@@ -170,6 +241,12 @@ namespace cron
       detail::set_cron_field(fields[0], cex.seconds, 0, detail::CRON_MAX_SECONDS);
       detail::set_cron_field(fields[1], cex.minutes, 0, detail::CRON_MAX_MINUTES);
       detail::set_cron_field(fields[2], cex.hours,   0, detail::CRON_MAX_HOURS);
+
+      detail::set_cron_days_of_week(fields[5], cex.days_of_week);
+
+      detail::set_cron_days_of_month(fields[3], cex.days_of_month);
+
+      detail::set_cron_month(fields[4], cex.months);
 
       return cex;
    }
