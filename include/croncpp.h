@@ -2,8 +2,10 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 #include <string_view>
 #include <bitset>
+#include <cctype>
 
 namespace cron
 {
@@ -60,12 +62,9 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
-      static std::vector<std::string> DAYS;
-      static std::vector<std::string> MONTHS;
+      static const inline std::vector<std::string> cron_standard_traits::DAYS = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
+      static const inline std::vector<std::string> cron_standard_traits::MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
    };
-
-   std::vector<std::string> cron_standard_traits::DAYS = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
-   std::vector<std::string> cron_standard_traits::MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
    struct cron_oracle_traits
    {
@@ -89,16 +88,13 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
-      static std::vector<std::string> DAYS;
-      static std::vector<std::string> MONTHS;
+      static const inline std::vector<std::string> cron_oracle_traits::DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
+      static const inline std::vector<std::string> cron_oracle_traits::MONTHS = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
    };
-
-   std::vector<std::string> cron_oracle_traits::DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
-   std::vector<std::string> cron_oracle_traits::MONTHS = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 
    namespace detail
    {
-      std::vector<std::string> split(std::string_view text, char const delimiter)
+      static std::vector<std::string> split(std::string_view text, char const delimiter)
       {
          std::vector<std::string> tokens;
          std::string token;
@@ -110,12 +106,12 @@ namespace cron
          return tokens;
       }
 
-      constexpr bool contains(std::string_view text, char const ch) noexcept
+      constexpr inline bool contains(std::string_view text, char const ch) noexcept
       {
          return std::string_view::npos != text.find_first_of(ch);
       }
 
-      cron_int to_cron_int(std::string_view text)
+      inline cron_int to_cron_int(std::string_view text)
       {
          try
          {
@@ -127,7 +123,7 @@ namespace cron
          }
       }
 
-      std::string to_upper(std::string text)
+      inline std::string to_upper(std::string text)
       {
          std::transform(std::begin(text), std::end(text),
             std::begin(text), std::toupper);
@@ -135,7 +131,7 @@ namespace cron
          return text;
       }
 
-      std::string replace_ordinals(std::string text, std::vector<std::string> const & replacement)
+      static std::string replace_ordinals(std::string text, std::vector<std::string> const & replacement)
       {
          for (size_t i = 0; i < replacement.size(); ++i)
          {
