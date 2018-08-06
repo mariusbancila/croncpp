@@ -1,8 +1,10 @@
 #include "catch.hpp"
 #include "croncpp.h"
 
-#define ARE_EQUAL(x, y)       REQUIRE(x == y)
-#define CRON_ORCL_EQUAL(x, y) ARE_EQUAL(make_cron<cron::cron_oracle_traits>(x), make_cron<cron::cron_oracle_traits>(y))
+#define ARE_EQUAL(x, y)          REQUIRE(x == y)
+#define CRON_ORCL_EQUAL(x, y)    ARE_EQUAL(make_cron<cron::cron_oracle_traits>(x), make_cron<cron::cron_oracle_traits>(y))
+#define CRON_EXPECT_EXCEPT(x)    REQUIRE_THROWS_AS(make_cron<cron::cron_oracle_traits>(x), bad_cronexpr)
+#define CRON_EXPECT_MSG(x, msg)  REQUIRE_THROWS_WITH(make_cron<cron::cron_oracle_traits>(x), msg)
 
 using namespace cron;
 
@@ -69,6 +71,7 @@ TEST_CASE("oracle: check months", "[oracle]")
    CRON_ORCL_EQUAL("* * * * 9 *", "* * * * oCT *");
    CRON_ORCL_EQUAL("* * * * 10 *", "* * * * nOV *");
    CRON_ORCL_EQUAL("* * * * 11 *", "* * * * DEC *");
+   CRON_ORCL_EQUAL("* * * * 0,FEB *", "* * * * JAN,1 *");
    CRON_ORCL_EQUAL("* * * * 0,5,10 *", "* * * * NOV,JUN,jan *");
    CRON_ORCL_EQUAL("* * * * 0,5,10 *", "* * * * jan,jun,nov *");
    CRON_ORCL_EQUAL("* * * * 0,5,10 *", "* * * * jun,jan,nov *");
@@ -97,15 +100,16 @@ TEST_CASE("oracle: check days of week", "[oracle]")
    CRON_ORCL_EQUAL("* * * * * 2/3", "* * * * * MON,THU");
 }
 
-TEST_CASE("Equivalent Oracle expressions", "[oracle]")
+TEST_CASE("oracle: invalid months", "[oracle]")
 {
-   CRON_ORCL_EQUAL("* * * 2 * *", "* * * 2 * ?");
-   CRON_ORCL_EQUAL("57,59 * * * * *", "57/2 * * * * *");
-   CRON_ORCL_EQUAL("1,3,5 * * * * *", "1-6/2 * * * * *");
-   CRON_ORCL_EQUAL("* * 4,8,12,16,20 * * *", "* * 4/4 * * *");
-   CRON_ORCL_EQUAL("* * * * * 1-7", "* * * * * TUE,WED,THU,FRI,SAT,SUN,MON");
-   CRON_ORCL_EQUAL("* * * * * 7", "* * * * * SAT");
-   CRON_ORCL_EQUAL("* * * * 0-11 *", "* * * * FEB,JAN,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC *");
-   CRON_ORCL_EQUAL("* * * * 1 *", "* * * * Feb *");
-   CRON_ORCL_EQUAL("*  *  * *  1 *", "* * * * 1 *");
+   CRON_EXPECT_EXCEPT("* * * * 12 *");
+   CRON_EXPECT_EXCEPT("* * * * -1 *");
+   CRON_EXPECT_EXCEPT("* * * * -1-12 *");
+}
+
+TEST_CASE("oracle: invalid days of week", "[oracle]")
+{
+   CRON_EXPECT_EXCEPT("* * * * * 8");
+   CRON_EXPECT_EXCEPT("* * * * * 0");
+   CRON_EXPECT_EXCEPT("* * * * * 0-8");
 }

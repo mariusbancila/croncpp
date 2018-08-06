@@ -193,6 +193,9 @@ namespace cron
          cron_int const minval,
          cron_int const maxval)
       {
+         if(value.length() > 0 && value[value.length()-1] == ',')
+            throw bad_cronexpr("Value cannot end with comma");
+
          auto fields = split(value, ',');
          if (fields.empty())
             throw bad_cronexpr("Expression parsing error");

@@ -1,9 +1,11 @@
 #include "catch.hpp"
 #include "croncpp.h"
 
-#define ARE_EQUAL(x, y)       REQUIRE(x == y)
-#define CRON_STD_EQUAL(x, y)  ARE_EQUAL(make_cron(x), make_cron(y))
-#define CRON_ORCL_EQUAL(x, y) ARE_EQUAL(make_cron<cron::cron_oracle_traits>(x), make_cron<cron::cron_oracle_traits>(y))
+#define ARE_EQUAL(x, y)          REQUIRE(x == y)
+#define CRON_EXPR(x)             make_cron(x)
+#define CRON_STD_EQUAL(x, y)     ARE_EQUAL(make_cron(x), make_cron(y))
+#define CRON_EXPECT_EXCEPT(x)    REQUIRE_THROWS_AS(make_cron(x), bad_cronexpr)
+#define CRON_EXPECT_MSG(x, msg)  REQUIRE_THROWS_WITH(make_cron(x), msg)
 
 using namespace cron;
 
@@ -81,6 +83,7 @@ TEST_CASE("standard: check months", "[std]")
    CRON_STD_EQUAL("* * * * 10 *", "* * * * oCT *");
    CRON_STD_EQUAL("* * * * 11 *", "* * * * nOV *");
    CRON_STD_EQUAL("* * * * 12 *", "* * * * DEC *");
+   CRON_STD_EQUAL("* * * * 1,FEB *", "* * * * JAN,2 *");
    CRON_STD_EQUAL("* * * * 1,6,11 *", "* * * * NOV,JUN,jan *");
    CRON_STD_EQUAL("* * * * 1,6,11 *", "* * * * jan,jun,nov *");
    CRON_STD_EQUAL("* * * * 1,6,11 *", "* * * * jun,jan,nov *");
@@ -109,13 +112,200 @@ TEST_CASE("standard: check days of week", "[std]")
    CRON_STD_EQUAL("* * * * * 1/3", "* * * * * MON,THU");
 }
 
-TEST_CASE("Check all", "[std]")
+TEST_CASE("standard: invalid seconds", "[std]")
 {
-   CRON_STD_EQUAL("* * * 2 * *", "* * * 2 * ?");
-   CRON_STD_EQUAL("* * 4,8,12,16,20 * * *", "* * 4/4 * * *");
-   CRON_STD_EQUAL("* * * * * 0-6", "* * * * * TUE,WED,THU,FRI,SAT,SUN,MON");
-   CRON_STD_EQUAL("* * * * * 0", "* * * * * SUN");
-   CRON_STD_EQUAL("* * * * 1-12 *", "* * * * FEB,JAN,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC *");
-   CRON_STD_EQUAL("* * * * 2 *", "* * * * Feb *");
-   CRON_STD_EQUAL("*  *  * *  1 *", "* * * * 1 *");
+   CRON_EXPECT_EXCEPT("TEN * * * * *");
+   CRON_EXPECT_EXCEPT("60 * * * * *");
+   CRON_EXPECT_EXCEPT("-1 * * * * *");
+   CRON_EXPECT_EXCEPT("0-60 * * * * *");
+   CRON_EXPECT_EXCEPT("0-10-20 * * * * *");
+   CRON_EXPECT_EXCEPT(", * * * * *");
+   CRON_EXPECT_EXCEPT("0,,1 * * * * *");
+   CRON_EXPECT_EXCEPT("0,1, * * * * *");
+   CRON_EXPECT_EXCEPT(",0,1 * * * * *");
+   CRON_EXPECT_EXCEPT("0/10/2 * * * * *");
+   CRON_EXPECT_EXCEPT("/ * * * * *");
+   CRON_EXPECT_EXCEPT("/2 * * * * *");
+   CRON_EXPECT_EXCEPT("2/ * * * * *");
+   CRON_EXPECT_EXCEPT("*/ * * * * *");
+   CRON_EXPECT_EXCEPT("/* * * * * *");
+   CRON_EXPECT_EXCEPT("-/ * * * * *");
+   CRON_EXPECT_EXCEPT("/- * * * * *");
+   CRON_EXPECT_EXCEPT("*-/ * * * * *");
+   CRON_EXPECT_EXCEPT("-*/ * * * * *");
+   CRON_EXPECT_EXCEPT("/-* * * * * *");
+   CRON_EXPECT_EXCEPT("/*- * * * * *");
+   CRON_EXPECT_EXCEPT("*2/ * * * * *");
+   CRON_EXPECT_EXCEPT("/2* * * * * *");
+   CRON_EXPECT_EXCEPT("-2/ * * * * *");
+   CRON_EXPECT_EXCEPT("/2- * * * * *");
+   CRON_EXPECT_EXCEPT("*2-/ * * * * *");
+   CRON_EXPECT_EXCEPT("-2*/ * * * * *");
+   CRON_EXPECT_EXCEPT("/2-* * * * * *");
+   CRON_EXPECT_EXCEPT("/2*- * * * * *");
+}
+
+TEST_CASE("standard: invalid minutes", "[std]")
+{
+   CRON_EXPECT_EXCEPT("* TEN * * * *");
+   CRON_EXPECT_EXCEPT("* 60 * * * *");
+   CRON_EXPECT_EXCEPT("* -1 * * * *");
+   CRON_EXPECT_EXCEPT("* 0-60 * * * *");
+   CRON_EXPECT_EXCEPT("* 0-10-20 * * * *");
+   CRON_EXPECT_EXCEPT("* , * * * *");
+   CRON_EXPECT_EXCEPT("* 0,,1 * * * *");
+   CRON_EXPECT_EXCEPT("* 0,1, * * * *");
+   CRON_EXPECT_EXCEPT("* ,0,1 * * * *");
+   CRON_EXPECT_EXCEPT("* 0/10/2 * * * *");
+   CRON_EXPECT_EXCEPT("* / * * * *");
+   CRON_EXPECT_EXCEPT("* /2 * * * *");
+   CRON_EXPECT_EXCEPT("* 2/ * * * *");
+   CRON_EXPECT_EXCEPT("* */ * * * *");
+   CRON_EXPECT_EXCEPT("* /* * * * *");
+   CRON_EXPECT_EXCEPT("* -/ * * * *");
+   CRON_EXPECT_EXCEPT("* /- * * * *");
+   CRON_EXPECT_EXCEPT("* *-/ * * * *");
+   CRON_EXPECT_EXCEPT("* -*/ * * * *");
+   CRON_EXPECT_EXCEPT("* /-* * * * *");
+   CRON_EXPECT_EXCEPT("* /*- * * * *");
+   CRON_EXPECT_EXCEPT("* *2/ * * * *");
+   CRON_EXPECT_EXCEPT("* /2* * * * *");
+   CRON_EXPECT_EXCEPT("* -2/ * * * *");
+   CRON_EXPECT_EXCEPT("* /2- * * * *");
+   CRON_EXPECT_EXCEPT("* *2-/ * * * *");
+   CRON_EXPECT_EXCEPT("* -2*/ * * * *");
+   CRON_EXPECT_EXCEPT("* /2-* * * * *");
+   CRON_EXPECT_EXCEPT("* /2*- * * * *");
+}
+
+TEST_CASE("standard: invalid hours", "[std]")
+{
+   CRON_EXPECT_EXCEPT("* * TEN * * *");
+   CRON_EXPECT_EXCEPT("* * 24 * * *");
+   CRON_EXPECT_EXCEPT("* * -1 * * *");
+   CRON_EXPECT_EXCEPT("* * 0-24 * * *");
+   CRON_EXPECT_EXCEPT("* * 0-10-20 * * *");
+   CRON_EXPECT_EXCEPT("* * , * * *");
+   CRON_EXPECT_EXCEPT("* * 0,,1 * * *");
+   CRON_EXPECT_EXCEPT("* * 0,1, * * *");
+   CRON_EXPECT_EXCEPT("* * ,0,1 * * *");
+   CRON_EXPECT_EXCEPT("* * 0/10/2 * * *");
+   CRON_EXPECT_EXCEPT("* * / * * *");
+   CRON_EXPECT_EXCEPT("* * /2 * * *");
+   CRON_EXPECT_EXCEPT("* * 2/ * * *");
+   CRON_EXPECT_EXCEPT("* * */ * * *");
+   CRON_EXPECT_EXCEPT("* * /* * * *");
+   CRON_EXPECT_EXCEPT("* * -/ * * *");
+   CRON_EXPECT_EXCEPT("* * /- * * *");
+   CRON_EXPECT_EXCEPT("* * *-/ * * *");
+   CRON_EXPECT_EXCEPT("* * -*/ * * *");
+   CRON_EXPECT_EXCEPT("* * /-* * * *");
+   CRON_EXPECT_EXCEPT("* * /*- * * *");
+   CRON_EXPECT_EXCEPT("* * *2/ * * *");
+   CRON_EXPECT_EXCEPT("* * /2* * * *");
+   CRON_EXPECT_EXCEPT("* * -2/ * * *");
+   CRON_EXPECT_EXCEPT("* * /2- * * *");
+   CRON_EXPECT_EXCEPT("* * *2-/ * * *");
+   CRON_EXPECT_EXCEPT("* * -2*/ * * *");
+   CRON_EXPECT_EXCEPT("* * /2-* * * *");
+   CRON_EXPECT_EXCEPT("* * /2*- * * *");
+}
+
+TEST_CASE("standard: invalid days of month", "[std]")
+{
+   CRON_EXPECT_EXCEPT("* * * TEN * *");
+   CRON_EXPECT_EXCEPT("* * * 32 * *");
+   CRON_EXPECT_EXCEPT("* * * 0 * *");
+   CRON_EXPECT_EXCEPT("* * * 0-32 * *");
+   CRON_EXPECT_EXCEPT("* * * 0-10-20 * *");
+   CRON_EXPECT_EXCEPT("* * * , * *");
+   CRON_EXPECT_EXCEPT("* * * 0,,1 * *");
+   CRON_EXPECT_EXCEPT("* * * 0,1, * *");
+   CRON_EXPECT_EXCEPT("* * * ,0,1 * *");
+   CRON_EXPECT_EXCEPT("* * * 0/10/2 * * *");
+   CRON_EXPECT_EXCEPT("* * * / * *");
+   CRON_EXPECT_EXCEPT("* * * /2 * *");
+   CRON_EXPECT_EXCEPT("* * * 2/ * *");
+   CRON_EXPECT_EXCEPT("* * * */ * *");
+   CRON_EXPECT_EXCEPT("* * * /* * *");
+   CRON_EXPECT_EXCEPT("* * * -/ * *");
+   CRON_EXPECT_EXCEPT("* * * /- * *");
+   CRON_EXPECT_EXCEPT("* * * *-/ * *");
+   CRON_EXPECT_EXCEPT("* * * -*/ * *");
+   CRON_EXPECT_EXCEPT("* * * /-* * *");
+   CRON_EXPECT_EXCEPT("* * * /*- * *");
+   CRON_EXPECT_EXCEPT("* * * *2/ * *");
+   CRON_EXPECT_EXCEPT("* * * /2* * *");
+   CRON_EXPECT_EXCEPT("* * * -2/ * *");
+   CRON_EXPECT_EXCEPT("* * * /2- * *");
+   CRON_EXPECT_EXCEPT("* * * *2-/ * *");
+   CRON_EXPECT_EXCEPT("* * * -2*/ * *");
+   CRON_EXPECT_EXCEPT("* * * /2-* * *");
+   CRON_EXPECT_EXCEPT("* * * /2*- * *");
+}
+
+TEST_CASE("standard: invalid months", "[std]")
+{
+   CRON_EXPECT_EXCEPT("* * * * TEN *");
+   CRON_EXPECT_EXCEPT("* * * * 13 *");
+   CRON_EXPECT_EXCEPT("* * * * 0 *");
+   CRON_EXPECT_EXCEPT("* * * * 0-13 *");
+   CRON_EXPECT_EXCEPT("* * * * 0-10-11 *");
+   CRON_EXPECT_EXCEPT("* * * * , *");
+   CRON_EXPECT_EXCEPT("* * * * 0,,1 *");
+   CRON_EXPECT_EXCEPT("* * * * 0,1, *");
+   CRON_EXPECT_EXCEPT("* * * * ,0,1 *");
+   CRON_EXPECT_EXCEPT("* * * * 0/10/2 *");
+   CRON_EXPECT_EXCEPT("* * * * / *");
+   CRON_EXPECT_EXCEPT("* * * * /2 *");
+   CRON_EXPECT_EXCEPT("* * * * 2/ *");
+   CRON_EXPECT_EXCEPT("* * * * */ *");
+   CRON_EXPECT_EXCEPT("* * * * /* *");
+   CRON_EXPECT_EXCEPT("* * * * -/ *");
+   CRON_EXPECT_EXCEPT("* * * * /- *");
+   CRON_EXPECT_EXCEPT("* * * * *-/ *");
+   CRON_EXPECT_EXCEPT("* * * * -*/ *");
+   CRON_EXPECT_EXCEPT("* * * * /-* *");
+   CRON_EXPECT_EXCEPT("* * * * /*- *");
+   CRON_EXPECT_EXCEPT("* * * * *2/ *");
+   CRON_EXPECT_EXCEPT("* * * * /2* *");
+   CRON_EXPECT_EXCEPT("* * * * -2/ *");
+   CRON_EXPECT_EXCEPT("* * * * /2- *");
+   CRON_EXPECT_EXCEPT("* * * * *2-/ *");
+   CRON_EXPECT_EXCEPT("* * * * -2*/ *");
+   CRON_EXPECT_EXCEPT("* * * * /2-* *");
+   CRON_EXPECT_EXCEPT("* * * * /2*- *");
+}
+
+TEST_CASE("standard: invalid days of week", "[std]")
+{
+   CRON_EXPECT_EXCEPT("* * * * * TEN");
+   CRON_EXPECT_EXCEPT("* * * * * 7");
+   CRON_EXPECT_EXCEPT("* * * * * -1");
+   CRON_EXPECT_EXCEPT("* * * * * -1-7");
+   CRON_EXPECT_EXCEPT("* * * * * 0-5-6");
+   CRON_EXPECT_EXCEPT("* * * * * ,");
+   CRON_EXPECT_EXCEPT("* * * * * 0,,1");
+   CRON_EXPECT_EXCEPT("* * * * * 0,1,");
+   CRON_EXPECT_EXCEPT("* * * * * ,0,1");
+   CRON_EXPECT_EXCEPT("* * * * * 0/2/2 *");
+   CRON_EXPECT_EXCEPT("* * * * * /");
+   CRON_EXPECT_EXCEPT("* * * * * /2");
+   CRON_EXPECT_EXCEPT("* * * * * 2/");
+   CRON_EXPECT_EXCEPT("* * * * * */");
+   CRON_EXPECT_EXCEPT("* * * * * /*");
+   CRON_EXPECT_EXCEPT("* * * * * -/");
+   CRON_EXPECT_EXCEPT("* * * * * /-");
+   CRON_EXPECT_EXCEPT("* * * * * *-/");
+   CRON_EXPECT_EXCEPT("* * * * * -*/");
+   CRON_EXPECT_EXCEPT("* * * * * /-*");
+   CRON_EXPECT_EXCEPT("* * * * * /*-");
+   CRON_EXPECT_EXCEPT("* * * * * *2/");
+   CRON_EXPECT_EXCEPT("* * * * * /2*");
+   CRON_EXPECT_EXCEPT("* * * * * -2/");
+   CRON_EXPECT_EXCEPT("* * * * * /2-");
+   CRON_EXPECT_EXCEPT("* * * * * *2-/");
+   CRON_EXPECT_EXCEPT("* * * * * -2*/");
+   CRON_EXPECT_EXCEPT("* * * * * /2-*");
+   CRON_EXPECT_EXCEPT("* * * * * /2*-");
 }
