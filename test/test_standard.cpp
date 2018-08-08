@@ -9,6 +9,20 @@
 
 using namespace cron;
 
+constexpr bool operator==(std::tm const & tm1, std::tm const & tm2) noexcept
+{
+   return
+      tm1.tm_sec == tm2.tm_sec &&
+      tm1.tm_min == tm2.tm_min &&
+      tm1.tm_hour == tm2.tm_hour &&
+      tm1.tm_mday == tm2.tm_mday &&
+      tm1.tm_mon == tm2.tm_mon &&
+      tm1.tm_year == tm2.tm_year &&
+      tm1.tm_wday == tm2.tm_wday &&
+      tm1.tm_yday == tm2.tm_yday &&
+      tm1.tm_isdst == tm2.tm_isdst;
+}
+/*
 void check_next(std::string_view expr, std::string_view time, std::string_view expected)
 {
    auto cex = make_cron(expr);
@@ -21,6 +35,25 @@ void check_next(std::string_view expr, std::string_view time, std::string_view e
    utils::time_to_tm(&result, &result_tm);
 
    auto value = utils::to_string(result_tm);
+
+   REQUIRE(value == expected);
+}
+*/
+void check_next(std::string_view expr, std::string_view time, std::string_view expected)
+{
+   auto cex = make_cron(expr);
+
+   auto initial_time = utils::to_tm(time);
+
+   auto result1 = cron_next(cex, utils::tm_to_time(initial_time));
+   auto result2 = cron_next(cex, initial_time);
+
+   std::tm result1_tm;
+   utils::time_to_tm(&result1, &result1_tm);
+
+   REQUIRE(result1_tm == result2);
+
+   auto value = utils::to_string(result1_tm);
 
    REQUIRE(value == expected);
 }

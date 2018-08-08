@@ -8,7 +8,7 @@
 #include <cctype>
 #include <ctime>
 #include <iomanip>
-
+#include <algorithm>
 
 namespace cron
 {
@@ -686,6 +686,28 @@ namespace cron
    }
 
    template <typename Traits = cron_standard_traits>
+   static std::tm cron_next(cronexpr const & cex, std::tm date)
+   {
+      time_t original = utils::tm_to_time(date);
+      if (INVALID_TIME == original) return {};
+
+      if (!detail::do_next<Traits>(cex, date, date.tm_year))
+         return {};
+
+      time_t calculated = utils::tm_to_time(date);
+      if (INVALID_TIME == calculated) return {};
+
+      if (calculated == original)
+      {
+         add_to_field(date, detail::cron_field::second, 1);
+         if (!detail::do_next<Traits>(cex, date, date.tm_year))
+            return {};
+      }
+
+      return date;
+   }
+
+   template <typename Traits = cron_standard_traits>
    static std::time_t cron_next(cronexpr const & cex, std::time_t const & date)
    {
       std::tm val;
@@ -709,5 +731,5 @@ namespace cron
       }
 
       return utils::tm_to_time(*dt);
-   }
+   }   
 }
