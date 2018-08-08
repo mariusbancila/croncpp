@@ -513,7 +513,7 @@ namespace cron
 
          if (INVALID_INDEX == next_value || next_value != value)
          {
-            set_field(date, field, next_value);
+            set_field(date, field, static_cast<int>(next_value));
             reset_all_fields(date, marked_fields);
          }
 
