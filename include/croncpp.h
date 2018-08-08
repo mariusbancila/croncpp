@@ -18,11 +18,11 @@ namespace cron
 
    constexpr size_t INVALID_INDEX = static_cast<size_t>(-1);
 
-   struct bad_cronexpr : public std::exception
+   struct bad_cronexpr : public std::runtime_error
    {
    public:
       explicit bad_cronexpr(std::string_view message) :
-         std::exception(message.data())
+         std::runtime_error(message.data())
       {}
    };
 
@@ -214,7 +214,7 @@ namespace cron
       inline std::string to_upper(std::string text)
       {
          std::transform(std::begin(text), std::end(text),
-            std::begin(text), std::toupper);
+            std::begin(text), static_cast<int(*)(int)>(std::toupper));
 
          return text;
       }
@@ -274,7 +274,7 @@ namespace cron
          return { first, last };
       }
 
-      template <int N>
+      template <size_t N>
       static void set_cron_field(
          std::string_view value,
          std::bitset<N>& target,

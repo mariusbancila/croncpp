@@ -2,6 +2,7 @@
 #include <chrono>
 #include <vector>
 #include <string>
+#include <functional>
 
 #include "croncpp.h"
 
