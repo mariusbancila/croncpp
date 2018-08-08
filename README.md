@@ -1,7 +1,7 @@
 # croncpp
-A C++17 header-only library for handling CRON expressions
-
 **THIS PROJECT IS UNDER DEVELOPMENT!**
+
+croncpp is a C++17 header-only cross-platform library for handling CRON expressions. It implements two basic operations, parsing an expression and computing the next occurence of the scheduled time.
 
 ## CRON expressions
 A CRON expression is a string composed of six fields (in some implementation seven) separated by a whites space representing a time schedule. The general form is the following (with the `years` being optional):
@@ -57,3 +57,83 @@ Examples:
 | 0 0 12 1/5 * ? | 12 PM every 5 days every month, starting on the first day of the month |
 | 0 11 11 11 11 ? | Every November 11th at 11:11 AM |
 
+## croncpp library
+
+To parse a CRON expression use `make_cron()` as follows:
+
+```
+try
+{
+   auto cron = cron::make_cron("* 0/5 * * * ?");
+}
+catch (cron::bad_cronexpr const & ex)
+{
+   std::cerr << ex.what() << '\n';
+}
+```
+
+To get the next occurence of the time schedule use the `cron_next()` function as follows:
+
+```
+try
+{
+   auto cron = cron::make_cron("* 0/5 * * * ?");
+   
+   std::time_t now = std::time(0);
+   std::time_t next = cron_next(cron, now);   
+}
+catch (cron::bad_cronexpr const & ex)
+{
+   std::cerr << ex.what() << '\n';
+}
+```
+
+Alternatively, you can use `std::tm` instead of `std::time_t`:
+
+```
+try
+{
+   auto cron = cron::make_cron("* 0/5 * * * ?");
+   
+   std::tm time = cron::utils::to_tm("2018-08-08 20:30:45");
+   std::tm next = cron_next(cron, time);
+}
+catch (cron::bad_cronexpr const & ex)
+{
+   std::cerr << ex.what() << '\n';
+}
+```
+
+When you use these functions as shown above you implicitly use the standard supported values for the fields, as described in the first section. However, you can use any other settings. The ones provided with the library are called `cron_standard_traits`, `cron_oracle_traits` and `cron_quartz_traits` (coresponding to the aforementioned settings).
+
+```
+try
+{
+   auto cron = cron::make_cron<cron_quartz_traits>("* 0/5 * * * ?");
+   
+   std::time_t now = std::time(0);
+   std::time_t next = cron_next<cron_quartz_traits>(cron, now);   
+}
+catch (cron::bad_cronexpr const & ex)
+{
+   std::cerr << ex.what() << '\n';
+}
+```
+
+## Benchmarks
+
+The following results are the average (in microseconds) for running the benchmark program ten times on Windows and Mac with different compilers (all with release settings).
+
+| VC++ 32-bit| VC++ 64-bit | GCC 32-bit | GCC 64-bit | Clang 64-bit |
+| --- | --- | --- | --- | --- |
+| 11.52 | 8.30 | 8.95 | 7.03 | 4.48 |
+
+VC++ 15.7.4 running on 
+* Windows 10 Enterprise build 17134
+* Intel Core i7, 2.67 GHz, 1 CPU / 4 cores / 8 logical, 6 RAM
+  
+GCC 8.1.0 / Clang LLVM 9.1.0 running on
+* macOS 10.13.5
+* Intel Core i7, 1.7 GHz, 1 CPU / 2 cores, 8 GB RAM
+
+![CRON parsin](res/cron_parsing.png)
