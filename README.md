@@ -1,7 +1,6 @@
 # croncpp
-**THIS PROJECT IS UNDER DEVELOPMENT!**
 
-croncpp is a C++17 header-only cross-platform library for handling CRON expressions. It implements two basic operations, parsing an expression and computing the next occurence of the scheduled time.
+croncpp is a C++17 header-only cross-platform library for handling CRON expressions. It implements two basic operations: parsing an expression and computing the next occurence of the scheduled time.
 
 ## CRON expressions
 A CRON expression is a string composed of six fields (in some implementation seven) separated by a whites space representing a time schedule. The general form is the following (with the `years` being optional):
@@ -72,6 +71,8 @@ catch (cron::bad_cronexpr const & ex)
 }
 ```
 
+`make_cron()` returns an object of the type `cronexpr`. The actual content of this object is not of real interest and, in fact, all its details are private. You can consider this as an implementation detail object that contains the necessary information for a CRON expression, in order to compute the next occurence of the time schedule, which is the actual important operation we are interested in.
+
 To get the next occurence of the time schedule use the `cron_next()` function as follows:
 
 ```
@@ -80,7 +81,7 @@ try
    auto cron = cron::make_cron("* 0/5 * * * ?");
    
    std::time_t now = std::time(0);
-   std::time_t next = cron_next(cron, now);   
+   std::time_t next = cron::cron_next(cron, now);   
 }
 catch (cron::bad_cronexpr const & ex)
 {
@@ -96,7 +97,7 @@ try
    auto cron = cron::make_cron("* 0/5 * * * ?");
    
    std::tm time = cron::utils::to_tm("2018-08-08 20:30:45");
-   std::tm next = cron_next(cron, time);
+   std::tm next = cron::cron_next(cron, time);
 }
 catch (cron::bad_cronexpr const & ex)
 {
@@ -112,7 +113,7 @@ try
    auto cron = cron::make_cron<cron_quartz_traits>("* 0/5 * * * ?");
    
    std::time_t now = std::time(0);
-   std::time_t next = cron_next<cron_quartz_traits>(cron, now);   
+   std::time_t next = cron::cron_next<cron_quartz_traits>(cron, now);   
 }
 catch (cron::bad_cronexpr const & ex)
 {
@@ -137,3 +138,7 @@ GCC 8.1.0 / Clang LLVM 9.1.0 running on
 * Intel Core i7, 1.7 GHz, 1 CPU / 2 cores, 8 GB RAM
 
 ![CRON parsin](res/cron_parsing.png)
+
+## Credits
+
+This library implementation is based on [ccronexpr](https://github.com/staticlibs/ccronexpr) ANSI C library, which in turn is based on the implementation of [CronSequenceGenerator](https://github.com/spring-projects/spring-framework/blob/babbf6e8710ab937cd05ece20270f51490299270/spring-context/src/main/java/org/springframework/scheduling/support/CronSequenceGenerator.java) from Spring Framework.
