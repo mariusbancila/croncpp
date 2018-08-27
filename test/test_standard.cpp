@@ -60,13 +60,8 @@ void check_next(std::string_view expr, std::string_view time, std::string_view e
 
 TEST_CASE("Test simple", "")
 {
-   auto c1 = make_cron("* * * * * *");
-   REQUIRE(c1.seconds.to_string() == "111111111111111111111111111111111111111111111111111111111111");
-   REQUIRE(c1.minutes.to_string() == "111111111111111111111111111111111111111111111111111111111111");
-   REQUIRE(c1.hours.to_string() == "111111111111111111111111");
-   REQUIRE(c1.days_of_week.to_string() == "1111111");
-   REQUIRE(c1.days_of_month.to_string() == "1111111111111111111111111111111");
-   REQUIRE(c1.months.to_string() == "111111111111");
+   auto cex = make_cron("* * * * * *");
+   REQUIRE(to_string(cex) == "111111111111111111111111111111111111111111111111111111111111 111111111111111111111111111111111111111111111111111111111111 111111111111111111111111 1111111 1111111111111111111111111111111 111111111111");
 }
 
 TEST_CASE("standard: check seconds", "[std]")

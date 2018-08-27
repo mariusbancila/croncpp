@@ -18,6 +18,16 @@ namespace cron
 
    constexpr size_t INVALID_INDEX = static_cast<size_t>(-1);
 
+   class cronexpr;
+
+   namespace detail
+   {
+      template <typename Traits>
+      static bool find_next(cronexpr const & cex,
+                            std::tm& date,
+                            size_t const dot);
+   }
+
    struct bad_cronexpr : public std::runtime_error
    {
    public:
@@ -26,7 +36,7 @@ namespace cron
       {}
    };
 
-   struct cronexpr
+   class cronexpr
    {
       std::bitset<60> seconds;
       std::bitset<60> minutes;
@@ -34,6 +44,19 @@ namespace cron
       std::bitset<7>  days_of_week;
       std::bitset<31> days_of_month;
       std::bitset<12> months;
+
+      friend bool operator==(cronexpr const & e1, cronexpr const & e2);
+      friend bool operator!=(cronexpr const & e1, cronexpr const & e2);
+
+      template <typename Traits>
+      friend cronexpr make_cron(std::string_view expr);
+
+      template <typename Traits>
+      friend bool detail::find_next(cronexpr const & cex,
+                                    std::tm& date,
+                                    size_t const dot);
+
+      friend std::string to_string(cronexpr const & cex);
    };
 
    inline bool operator==(cronexpr const & e1, cronexpr const & e2)
@@ -46,9 +69,21 @@ namespace cron
          e1.days_of_month == e2.days_of_month &&
          e1.months == e2.months;
    }
+
    inline bool operator!=(cronexpr const & e1, cronexpr const & e2)
    {
       return !(e1 == e2);
+   }
+
+   inline std::string to_string(cronexpr const & cex)
+   {
+      return
+         cex.seconds.to_string() + " " +
+         cex.minutes.to_string() + " " +
+         cex.hours.to_string() + " " +
+         cex.days_of_week.to_string() + " " +
+         cex.days_of_month.to_string() + " " +
+         cex.months.to_string();
    }
 
    struct cron_standard_traits
@@ -169,6 +204,14 @@ namespace cron
 
          return str.str();
       }
+
+      inline std::string to_upper(std::string text)
+      {
+         std::transform(std::begin(text), std::end(text),
+            std::begin(text), static_cast<int(*)(int)>(std::toupper));
+
+         return text;
+      }
    }
 
    namespace detail
@@ -211,14 +254,6 @@ namespace cron
          {
             throw bad_cronexpr(ex.what());
          }
-      }
-
-      inline std::string to_upper(std::string text)
-      {
-         std::transform(std::begin(text), std::end(text),
-            std::begin(text), static_cast<int(*)(int)>(std::toupper));
-
-         return text;
       }
 
       static std::string replace_ordinals(std::string text, std::vector<std::string> const & replacement)
@@ -330,7 +365,7 @@ namespace cron
          std::string value,
          std::bitset<7>& target)
       {
-         auto days = detail::to_upper(value);
+         auto days = utils::to_upper(value);
          auto days_replaced = detail::replace_ordinals(days, Traits::DAYS);
 
          if (days_replaced.size() == 1 && days_replaced[0] == '?')
@@ -363,7 +398,7 @@ namespace cron
          std::string value,
          std::bitset<12>& target)
       {
-         auto month = to_upper(value);
+         auto month = utils::to_upper(value);
          auto month_replaced = replace_ordinals(month, Traits::MONTHS);
 
          set_cron_field(
@@ -550,10 +585,9 @@ namespace cron
       }
 
       template <typename Traits>
-      static bool do_next(
-         cronexpr const & cex,
-         std::tm& date,
-         size_t const dot)
+      static bool find_next(cronexpr const & cex,
+                            std::tm& date,
+                            size_t const dot)
       {
          bool res = true;
 
@@ -592,7 +626,7 @@ namespace cron
          }
          else
          {
-            res = do_next<Traits>(cex, date, dot);
+            res = find_next<Traits>(cex, date, dot);
             if (!res) return res;
          }
 
@@ -612,7 +646,7 @@ namespace cron
          }
          else
          {
-            res = do_next<Traits>(cex, date, dot);
+            res = find_next<Traits>(cex, date, dot);
             if (!res) return res;
          }
 
@@ -631,7 +665,7 @@ namespace cron
          }
          else
          {
-            res = do_next<Traits>(cex, date, dot);
+            res = find_next<Traits>(cex, date, dot);
             if (!res) return res;
          }
 
@@ -650,7 +684,7 @@ namespace cron
             if (date.tm_year - dot > Traits::CRON_MAX_YEARS_DIFF)
                return false;
 
-            res = do_next<Traits>(cex, date, dot);
+            res = find_next<Traits>(cex, date, dot);
             if (!res) return res;
          }
 
@@ -693,7 +727,7 @@ namespace cron
       time_t original = utils::tm_to_time(date);
       if (INVALID_TIME == original) return {};
 
-      if (!detail::do_next<Traits>(cex, date, date.tm_year))
+      if (!detail::find_next<Traits>(cex, date, date.tm_year))
          return {};
 
       time_t calculated = utils::tm_to_time(date);
@@ -702,7 +736,7 @@ namespace cron
       if (calculated == original)
       {
          add_to_field(date, detail::cron_field::second, 1);
-         if (!detail::do_next<Traits>(cex, date, date.tm_year))
+         if (!detail::find_next<Traits>(cex, date, date.tm_year))
             return {};
       }
 
@@ -719,7 +753,7 @@ namespace cron
       time_t original = utils::tm_to_time(*dt);
       if (INVALID_TIME == original) return INVALID_TIME;
 
-      if(!detail::do_next<Traits>(cex, *dt, dt->tm_year))
+      if(!detail::find_next<Traits>(cex, *dt, dt->tm_year))
          return INVALID_TIME;
 
       time_t calculated = utils::tm_to_time(*dt);
@@ -728,7 +762,7 @@ namespace cron
       if (calculated == original)
       {
          add_to_field(*dt, detail::cron_field::second, 1);
-         if(!detail::do_next<Traits>(cex, *dt, dt->tm_year))
+         if(!detail::find_next<Traits>(cex, *dt, dt->tm_year))
             return INVALID_TIME;
       }
 
