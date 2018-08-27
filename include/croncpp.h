@@ -151,9 +151,11 @@ namespace cron
          std::istringstream str(time.data());
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
 
-         std::tm result;
+         std::tm result{0};
          str >> std::get_time(&result, "%Y-%m-%d %H:%M:%S");
          if (str.fail()) throw std::runtime_error("Parsing date failed!");
+
+         result.tm_isdst = -1; // DST info not available
 
          return result;
       }
