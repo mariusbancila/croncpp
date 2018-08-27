@@ -212,20 +212,6 @@ namespace cron
 
          return text;
       }
-   }
-
-   namespace detail
-   {
-      enum class cron_field
-      {
-         second,
-         minute,
-         hour_of_day,
-         day_of_week,
-         day_of_month,
-         month,
-         year
-      };
 
       static std::vector<std::string> split(std::string_view text, char const delimiter)
       {
@@ -243,6 +229,20 @@ namespace cron
       {
          return std::string_view::npos != text.find_first_of(ch);
       }
+   }
+
+   namespace detail
+   {
+      enum class cron_field
+      {
+         second,
+         minute,
+         hour_of_day,
+         day_of_week,
+         day_of_month,
+         month,
+         year
+      };
 
       inline cron_int to_cron_int(std::string_view text)
       {
@@ -256,7 +256,9 @@ namespace cron
          }
       }
 
-      static std::string replace_ordinals(std::string text, std::vector<std::string> const & replacement)
+      static std::string replace_ordinals(
+         std::string text, 
+         std::vector<std::string> const & replacement)
       {
          for (size_t i = 0; i < replacement.size(); ++i)
          {
@@ -280,14 +282,14 @@ namespace cron
             first = minval;
             last = maxval;
          } 
-         else if (!contains(field, '-'))
+         else if (!utils::contains(field, '-'))
          {
             first = to_cron_int(field);
             last = first;
          }
          else
          {
-            auto parts = split(field, '-');
+            auto parts = utils::split(field, '-');
             if (parts.size() != 2)
                throw bad_cronexpr("Specified range requires two fields");
 
@@ -321,13 +323,13 @@ namespace cron
          if(value.length() > 0 && value[value.length()-1] == ',')
             throw bad_cronexpr("Value cannot end with comma");
 
-         auto fields = split(value, ',');
+         auto fields = utils::split(value, ',');
          if (fields.empty())
             throw bad_cronexpr("Expression parsing error");
 
          for (auto const & field : fields)
          {
-            if (!contains(field, '/'))
+            if (!utils::contains(field, '/'))
             {
                auto[first, last] = detail::make_range(field, minval, maxval);
                for (cron_int i = first - minval; i <= last - minval; ++i)
@@ -337,13 +339,13 @@ namespace cron
             }
             else 
             {
-               auto parts = detail::split(field, '/');
+               auto parts = utils::split(field, '/');
                if (parts.size() != 2)
                   throw bad_cronexpr("Incrementer must have two fields");
 
                auto[first, last] = detail::make_range(parts[0], minval, maxval);
 
-               if (!contains(parts[0], '-'))
+               if (!utils::contains(parts[0], '-'))
                {
                   last = maxval;
                }
@@ -423,7 +425,10 @@ namespace cron
          return INVALID_INDEX;
       }
 
-      inline void add_to_field(std::tm& date, cron_field const field, int const val)
+      inline void add_to_field(
+         std::tm& date, 
+         cron_field const field, 
+         int const val)
       {
          switch (field)
          {
@@ -452,7 +457,10 @@ namespace cron
             throw bad_cronexpr("Invalid time expression");
       }
 
-      inline void set_field(std::tm& date, cron_field const field, int const val)
+      inline void set_field(
+         std::tm& date, 
+         cron_field const field, 
+         int const val)
       {
          switch (field)
          {
@@ -483,7 +491,9 @@ namespace cron
             throw bad_cronexpr("Invalid time expression");
       }
 
-      inline void reset_field(std::tm& date, cron_field const field)
+      inline void reset_field(
+         std::tm& date, 
+         cron_field const field)
       {
          switch (field)
          {
@@ -514,7 +524,9 @@ namespace cron
             throw bad_cronexpr("Invalid time expression");
       }
 
-      inline void reset_all_fields(std::tm& date, std::bitset<7> const & marked_fields)
+      inline void reset_all_fields(
+         std::tm& date, 
+         std::bitset<7> const & marked_fields)
       {
          for (size_t i = 0; i < marked_fields.size(); ++i)
          {
@@ -523,7 +535,9 @@ namespace cron
          }
       }
 
-      inline void mark_field(std::bitset<7> & orders, cron_field const field)
+      inline void mark_field(
+         std::bitset<7> & orders, 
+         cron_field const field)
       {
          if (!orders.test(static_cast<size_t>(field)))
             orders.set(static_cast<size_t>(field));
@@ -700,7 +714,7 @@ namespace cron
       if (expr.empty())
          throw bad_cronexpr("Invalid empty cron expression");
 
-      auto fields = detail::split(expr, ' ');
+      auto fields = utils::split(expr, ' ');
       fields.erase(
          std::remove_if(std::begin(fields), std::end(fields), 
             [](std::string_view s) {return s.empty(); }),
