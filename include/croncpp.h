@@ -20,6 +20,9 @@ namespace cron
 
    class cronexpr;
 
+   template <typename Traits>
+   static cronexpr make_cron(std::string_view expr);
+
    namespace detail
    {
       template <typename Traits>
