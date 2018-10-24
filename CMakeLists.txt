@@ -1,20 +1,24 @@
 cmake_minimum_required(VERSION 3.7.0)
 project(croncpp)
 
-if(WIN32)
-	message(status "Setting MSVC flags")
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHc /std:c++latest")
-   add_definitions(-D_SCL_SECURE_NO_WARNINGS)
-elseif(APPLE)
-	message(status "Setting Clang flags")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -fexceptions -g -Wall")
-else()
-	include_directories(${LIBUUID_INCLUDE_DIR})
-   message(status "Setting GCC flags")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1z -fexceptions -g -Wall")
-endif()
+# Include
+include(GNUInstallDirs)
+include(ExternalProject)
 
-message(status "** CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+add_library(${PROJECT_NAME} INTERFACE)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_11)
 
-add_subdirectory(benchmark)
-add_subdirectory(test)
+target_include_directories(${PROJECT_NAME} INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+
+install(TARGETS ${PROJECT_NAME} EXPORT croncppConfig
+    ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
+
+install(EXPORT croncppConfig DESTINATION share/croncpp/cmake)
+
+export(TARGETS ${PROJECT_NAME} FILE croncppConfig.cmake)
