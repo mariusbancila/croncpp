@@ -18,17 +18,28 @@ namespace cron
 
    constexpr size_t INVALID_INDEX = static_cast<size_t>(-1);
 
-   class cronexpr;
-
-   template <typename Traits>
-   static cronexpr make_cron(std::string_view expr);
+   class cronexpr;   
 
    namespace detail
    {
+      enum class cron_field
+      {
+         second,
+         minute,
+         hour_of_day,
+         day_of_week,
+         day_of_month,
+         month,
+         year
+      };
+
       template <typename Traits>
       static bool find_next(cronexpr const & cex,
                             std::tm& date,
                             size_t const dot);
+
+      template <cron_field field>
+      constexpr auto& cron_field_ref(cronexpr& cex);
    }
 
    struct bad_cronexpr : public std::runtime_error
@@ -39,55 +50,6 @@ namespace cron
       {}
    };
 
-   class cronexpr
-   {
-      std::bitset<60> seconds;
-      std::bitset<60> minutes;
-      std::bitset<24> hours;
-      std::bitset<7>  days_of_week;
-      std::bitset<31> days_of_month;
-      std::bitset<12> months;
-
-      friend bool operator==(cronexpr const & e1, cronexpr const & e2);
-      friend bool operator!=(cronexpr const & e1, cronexpr const & e2);
-
-      template <typename Traits>
-      friend cronexpr make_cron(std::string_view expr);
-
-      template <typename Traits>
-      friend bool detail::find_next(cronexpr const & cex,
-                                    std::tm& date,
-                                    size_t const dot);
-
-      friend std::string to_string(cronexpr const & cex);
-   };
-
-   inline bool operator==(cronexpr const & e1, cronexpr const & e2)
-   {
-      return
-         e1.seconds == e2.seconds &&
-         e1.minutes == e2.minutes &&
-         e1.hours == e2.hours &&
-         e1.days_of_week == e2.days_of_week &&
-         e1.days_of_month == e2.days_of_month &&
-         e1.months == e2.months;
-   }
-
-   inline bool operator!=(cronexpr const & e1, cronexpr const & e2)
-   {
-      return !(e1 == e2);
-   }
-
-   inline std::string to_string(cronexpr const & cex)
-   {
-      return
-         cex.seconds.to_string() + " " +
-         cex.minutes.to_string() + " " +
-         cex.hours.to_string() + " " +
-         cex.days_of_week.to_string() + " " +
-         cex.days_of_month.to_string() + " " +
-         cex.months.to_string();
-   }
 
    struct cron_standard_traits
    {
@@ -167,6 +129,56 @@ namespace cron
       static const inline std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
    };
 
+   class cronexpr
+   {
+      std::bitset<60> seconds;
+      std::bitset<60> minutes;
+      std::bitset<24> hours;
+      std::bitset<7>  days_of_week;
+      std::bitset<31> days_of_month;
+      std::bitset<12> months;
+
+      friend bool operator==(cronexpr const & e1, cronexpr const & e2);
+      friend bool operator!=(cronexpr const & e1, cronexpr const & e2);
+
+      template <detail::cron_field field>
+      friend constexpr auto& detail::cron_field_ref(cronexpr& cex);
+
+      template <typename Traits>
+      friend bool detail::find_next(cronexpr const & cex,
+                                    std::tm& date,
+                                    size_t const dot);
+
+      friend std::string to_string(cronexpr const & cex);
+   };
+
+   inline bool operator==(cronexpr const & e1, cronexpr const & e2)
+   {
+      return
+         e1.seconds == e2.seconds &&
+         e1.minutes == e2.minutes &&
+         e1.hours == e2.hours &&
+         e1.days_of_week == e2.days_of_week &&
+         e1.days_of_month == e2.days_of_month &&
+         e1.months == e2.months;
+   }
+
+   inline bool operator!=(cronexpr const & e1, cronexpr const & e2)
+   {
+      return !(e1 == e2);
+   }
+
+   inline std::string to_string(cronexpr const & cex)
+   {
+      return
+         cex.seconds.to_string() + " " +
+         cex.minutes.to_string() + " " +
+         cex.hours.to_string() + " " +
+         cex.days_of_week.to_string() + " " +
+         cex.days_of_month.to_string() + " " +
+         cex.months.to_string();
+   }
+
    namespace utils
    {
       inline std::time_t tm_to_time(std::tm& date)
@@ -236,16 +248,6 @@ namespace cron
 
    namespace detail
    {
-      enum class cron_field
-      {
-         second,
-         minute,
-         hour_of_day,
-         day_of_week,
-         day_of_month,
-         month,
-         year
-      };
 
       inline cron_int to_cron_int(std::string_view text)
       {
@@ -706,6 +708,23 @@ namespace cron
          }
 
          return res;
+      }      
+
+      template <cron_field field>
+      constexpr auto& cron_field_ref(cronexpr& cex)
+      {
+         if constexpr (field == cron_field::day_of_month) 
+            return cex.days_of_month;
+         else if constexpr (field == cron_field::day_of_week)
+            return cex.days_of_week;
+         else if constexpr (field == cron_field::hour_of_day)
+            return cex.hours;
+         else if constexpr (field == cron_field::minute)
+            return cex.minutes;
+         else if constexpr (field == cron_field::second)
+            return cex.seconds;
+         else if constexpr (field == cron_field::month)
+            return cex.months;
       }
    }
 
@@ -719,21 +738,21 @@ namespace cron
 
       auto fields = utils::split(expr, ' ');
       fields.erase(
-         std::remove_if(std::begin(fields), std::end(fields), 
+         std::remove_if(std::begin(fields), std::end(fields),
             [](std::string_view s) {return s.empty(); }),
          std::end(fields));
       if (fields.size() != 6)
          throw bad_cronexpr("cron expression must have six fields");
 
-      detail::set_cron_field(fields[0], cex.seconds, Traits::CRON_MIN_SECONDS, Traits::CRON_MAX_SECONDS);
-      detail::set_cron_field(fields[1], cex.minutes, Traits::CRON_MIN_MINUTES, Traits::CRON_MAX_MINUTES);
-      detail::set_cron_field(fields[2], cex.hours,   Traits::CRON_MIN_HOURS, Traits::CRON_MAX_HOURS);
+      detail::set_cron_field(fields[0], detail::cron_field_ref<detail::cron_field::second>(cex), Traits::CRON_MIN_SECONDS, Traits::CRON_MAX_SECONDS);
+      detail::set_cron_field(fields[1], detail::cron_field_ref<detail::cron_field::minute>(cex), Traits::CRON_MIN_MINUTES, Traits::CRON_MAX_MINUTES);
+      detail::set_cron_field(fields[2], detail::cron_field_ref<detail::cron_field::hour_of_day>(cex), Traits::CRON_MIN_HOURS, Traits::CRON_MAX_HOURS);
 
-      detail::set_cron_days_of_week<Traits>(fields[5], cex.days_of_week);
+      detail::set_cron_days_of_week<Traits>(fields[5], detail::cron_field_ref<detail::cron_field::day_of_week>(cex));
 
-      detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month);
+      detail::set_cron_days_of_month<Traits>(fields[3], detail::cron_field_ref<detail::cron_field::day_of_month>(cex));
 
-      detail::set_cron_month<Traits>(fields[4], cex.months);
+      detail::set_cron_month<Traits>(fields[4], detail::cron_field_ref<detail::cron_field::month>(cex));
 
       return cex;
    }
