@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.7.0)
 project(croncpp)
 
+set(CMAKE_CXX_STANDARD 17)
+
 # Include
 include(GNUInstallDirs)
 include(ExternalProject)
@@ -22,3 +24,6 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAM
 install(EXPORT croncppConfig DESTINATION share/croncpp/cmake)
 
 export(TARGETS ${PROJECT_NAME} FILE croncppConfig.cmake)
+
+add_subdirectory(benchmark)
+add_subdirectory(test)
