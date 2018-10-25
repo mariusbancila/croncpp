@@ -728,7 +728,7 @@ namespace cron
       }
    }
 
-   template <typename Traits>
+   template <typename Traits = cron_standard_traits>
    static cronexpr make_cron(std::string_view expr)
    {
       cronexpr cex;
