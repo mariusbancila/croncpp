@@ -4,7 +4,7 @@ compiler: gcc
 before_script:
   - cd ${TRAVIS_BUILD_DIR}
   - cmake -H. -BBuild -DCMAKE_BUILD_TYPE=Release -Wdev
-  - cd build
+  - cd Build
   
 script:
   - make -j 2
