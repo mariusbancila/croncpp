@@ -29,7 +29,7 @@ void test_cron(std::vector<std::string> const & expressions)
    {
       try
       {
-         auto cron = cron::make_cron(e);
+         cron::make_cron(e);
       }
       catch (cron::bad_cronexpr const & ex)
       {
