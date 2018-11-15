@@ -2,6 +2,8 @@
 
 croncpp is a C++17 header-only cross-platform library for handling CRON expressions. It implements two basic operations: parsing an expression and computing the next occurence of the scheduled time.
 
+[![Build status](https://ci.appveyor.com/api/projects/status/lewwk7b42xwfp4xy?svg=true&pendingText=tests%20-%20pending&failingText=tests%20-%20FAILED&passingText=tests%20-%20OK)](https://ci.appveyor.com/project/mariusbancila/croncpp)
+
 ## CRON expressions
 A CRON expression is a string composed of six fields (in some implementation seven) separated by a whites space representing a time schedule. The general form is the following (with the `years` being optional):
 
