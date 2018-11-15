@@ -1,0 +1,11 @@
+language: cpp
+compiler: gcc
+
+before_script:
+  - mkdir build
+  - cd build
+  - cmake -H. -BBuild -DCMAKE_BUILD_TYPE=Release -Wdev
+  
+script:
+  - make -j 2
+  - ctest -V -j 2 -C Release
