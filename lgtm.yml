@@ -1,5 +1,8 @@
 path_classifiers:
   test:
-    - "test"
-    - exclude: "catch"
-     
+    - test
+    - benchmark
+    - exclude: catch
+  docs:
+    - README.md
+    - LICENSE
