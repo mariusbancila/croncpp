@@ -9,6 +9,7 @@ before_install:
 install: 
   - sudo apt-get install -qq g++-8
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 90
+  - sudo apt-get install -qq cppcheck
   
 before_script:
   - cd ${TRAVIS_BUILD_DIR}
@@ -18,3 +19,5 @@ before_script:
 script:
   - make -j 2
   - ctest -V -j 2 -C Release
+  - cppcheck --quiet --error-exitcode=1 . 
+  
