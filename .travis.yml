@@ -18,10 +18,9 @@ before_script:
   - cd Build
   
 script:
-  - ./configure --enable-gcov && make && make check
   - make -j 2
   - ctest -V -j 2 -C Release
   - cppcheck --quiet --error-exitcode=1 . 
 
 after_success:
-  - coveralls --exclude lib --exclude test --gcov-options '\-lp'
+  - coveralls --exclude lib --exclude test --gcov 'gcov-4.9' --gcov-options '\-lp'
