@@ -18,7 +18,7 @@ before_script:
   - cd Build
   
 script:
-  - ../configure --enable-gcov && make && make check
+  - ./configure --enable-gcov && make && make check
   - make -j 2
   - ctest -V -j 2 -C Release
   - cppcheck --quiet --error-exitcode=1 . 
