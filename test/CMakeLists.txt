@@ -9,15 +9,17 @@ file(GLOB SOURCES "*.cpp" "include/*.cpp")
 
 add_executable(test_croncpp ${SOURCES} ${headers})
 
-enable_testing()
+if(BUILD_TESTS)
+    enable_testing()
 
-add_test(NAME "test_croncpp" COMMAND "test_croncpp" "-r compact")
-set_tests_properties("test_croncpp"
-    PROPERTIES
-    PASS_REGULAR_EXPRESSION "Passed all.*")
-set_tests_properties("test_croncpp"
-    PROPERTIES
-    FAIL_REGULAR_EXPRESSION "Failed \\d+ test cases")
-set_tests_properties("test_croncpp"
-    PROPERTIES
-    TIMEOUT 120)
+    add_test(NAME "test_croncpp" COMMAND "test_croncpp" "-r compact")
+    set_tests_properties("test_croncpp"
+        PROPERTIES
+        PASS_REGULAR_EXPRESSION "Passed all.*")
+    set_tests_properties("test_croncpp"
+        PROPERTIES
+        FAIL_REGULAR_EXPRESSION "Failed \\d+ test cases")
+    set_tests_properties("test_croncpp"
+        PROPERTIES
+        TIMEOUT 120)
+endif()
