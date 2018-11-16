@@ -23,4 +23,4 @@ script:
   - cppcheck --quiet --error-exitcode=1 . 
 
 after_success:
-  - coveralls --exclude lib --exclude test --gcov-options '\-lp'
+  - coveralls --exclude lib --exclude benchmarks --gcov-options '\-lp'
