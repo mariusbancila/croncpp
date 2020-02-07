@@ -174,9 +174,9 @@ namespace cron
          cex.seconds.to_string() + " " +
          cex.minutes.to_string() + " " +
          cex.hours.to_string() + " " +
-         cex.days_of_week.to_string() + " " +
          cex.days_of_month.to_string() + " " +
-         cex.months.to_string();
+         cex.months.to_string() + " " +
+         cex.days_of_week.to_string();
    }
 
    namespace utils
