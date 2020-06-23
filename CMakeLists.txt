@@ -49,6 +49,7 @@ else()
 endif()
 
 if(CRONCPP_BUILD_TESTS)
+   enable_testing()
   add_subdirectory(test)
 endif()
 

@@ -4,8 +4,6 @@ add_executable(test_croncpp ${SOURCES})
 target_link_libraries(test_croncpp PRIVATE croncpp croncpp_options)
 target_include_directories(test_croncpp PRIVATE ${CMAKE_SOURCE_DIR}/catch)
 
-enable_testing()
-
 add_test(NAME "test_croncpp" COMMAND "test_croncpp" "-r compact")
 set_tests_properties("test_croncpp" PROPERTIES PASS_REGULAR_EXPRESSION
                                                "Passed all.*")
