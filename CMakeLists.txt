@@ -37,14 +37,14 @@ if(WIN32)
   target_compile_definitions(croncpp_options
                              INTERFACE "-D_SCL_SECURE_NO_WARNINGS")
 elseif(APPLE)
-  target_compile_options(croncpp_options INTERFACE "-fexceptions -g -Wall")
+  target_compile_options(croncpp_options INTERFACE -fexceptions -g -Wall)
 else()
-  target_compile_options(croncpp_options INTERFACE "-fexceptions -g -Wall")
+  target_compile_options(croncpp_options INTERFACE -fexceptions -g -Wall)
   # enable profiling
   if(CRONCPP_ENABLE_PROFILING)
     target_compile_options(
       croncpp_options
-      INTERFACE "--coverage -g -O0 -fprofile-arcs -ftest-coverage")
+      INTERFACE --coverage -g -O0 -fprofile-arcs -ftest-coverage)
   endif()
 endif()
 
