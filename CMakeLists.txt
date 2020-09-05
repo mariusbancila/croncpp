@@ -44,7 +44,8 @@ else()
   if(CRONCPP_ENABLE_PROFILING)
     target_compile_options(
       croncpp_options
-      INTERFACE --coverage -lgcov -g -O0 -fprofile-arcs -ftest-coverage)
+      INTERFACE --coverage -g -O0 -fprofile-arcs -ftest-coverage)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage -lgcov" CACHE STRING "Linker Flags for Profiling" FORCE)
   endif()
 endif()
 
