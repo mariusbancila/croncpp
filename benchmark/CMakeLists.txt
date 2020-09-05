@@ -1,10 +1,5 @@
-cmake_minimum_required(VERSION 3.7.0)
-project(bench_croncpp)
+set(SOURCES main.cpp)
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
-
-file(GLOB headers ${CMAKE_SOURCE_DIR}/include/*.h)
-file(GLOB SOURCES "*.cpp" "include/*.cpp")
-
-add_executable(bench_croncpp ${SOURCES} ${headers})
-
+add_executable(bench_croncpp ${SOURCES})
+target_link_libraries(bench_croncpp PRIVATE croncpp croncpp_options)
+target_include_directories(bench_croncpp PRIVATE ${CMAKE_SOURCE_DIR}/catch)
