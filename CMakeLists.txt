@@ -44,7 +44,7 @@ else()
   if(CRONCPP_ENABLE_PROFILING)
     target_compile_options(
       croncpp_options
-      INTERFACE --coverage -g -O0 -fprofile-arcs -ftest-coverage)
+      INTERFACE --coverage -lgcov -g -O0 -fprofile-arcs -ftest-coverage)
   endif()
 endif()
 
