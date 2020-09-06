@@ -209,7 +209,7 @@ namespace cron
       friend std::string to_string(cronexpr const & cex);
 
       template <typename Traits>
-      friend static cronexpr make_cron(STRING_VIEW expr);
+      friend cronexpr make_cron(STRING_VIEW expr);
    };
 
    inline bool operator==(cronexpr const & e1, cronexpr const & e2)
