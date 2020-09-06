@@ -482,7 +482,7 @@ namespace cron
          auto month = utils::to_upper(value);
          auto month_replaced = replace_ordinals(
             month, 
-#if IS_CPP17
+#ifdef IS_CPP17
             Traits::MONTHS
 #else
             Traits::MONTHS()
