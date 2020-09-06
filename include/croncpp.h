@@ -184,6 +184,11 @@ namespace cron
 #endif
    };
 
+   class cronexpr;
+
+   template <typename Traits = cron_standard_traits>
+   static cronexpr make_cron(STRING_VIEW expr);
+
    class cronexpr
    {
       std::bitset<60> seconds;
@@ -256,7 +261,7 @@ namespace cron
          std::istringstream str(time.data());
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
 
-         std::tm result{0};
+         std::tm result;
          str >> std::get_time(&result, "%Y-%m-%d %H:%M:%S");
          if (str.fail()) throw std::runtime_error("Parsing date failed!");
 
@@ -499,8 +504,8 @@ namespace cron
       template <size_t N>
       inline size_t next_set_bit(
          std::bitset<N> const & target,
-         size_t minimum,
-         size_t maximum,
+         size_t /*minimum*/,
+         size_t /*maximum*/,
          size_t offset)
       {
          for (auto i = offset; i < N; ++i)
@@ -792,7 +797,7 @@ namespace cron
       }      
    }
 
-   template <typename Traits = cron_standard_traits>
+   template <typename Traits>
    static cronexpr make_cron(STRING_VIEW expr)
    {
       cronexpr cex;
