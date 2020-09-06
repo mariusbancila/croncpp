@@ -1,14 +1,18 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(
   croncpp
   VERSION 0.0.0
   LANGUAGES CXX)
+  
+if(NOT DEFINED CXX_STD_VER)
+  set(CXX_STD_VER cxx_std_17)
+endif()
 
 add_library(croncpp INTERFACE)
 target_include_directories(
   croncpp INTERFACE $<INSTALL_INTERFACE:include>
                     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-target_compile_features(croncpp INTERFACE cxx_std_17)
+target_compile_features(croncpp INTERFACE ${CXX_STD_VER})
 add_library(croncpp::croncpp ALIAS croncpp)
 
 install(
@@ -30,7 +34,7 @@ install(
   DESTINATION lib/cmake/croncpp)
 
 add_library(croncpp_options INTERFACE)
-target_compile_features(croncpp_options INTERFACE cxx_std_17)
+target_compile_features(croncpp_options INTERFACE ${CXX_STD_VER})
 
 if(WIN32)
   target_compile_options(croncpp_options INTERFACE "/EHc")
@@ -50,7 +54,7 @@ else()
 endif()
 
 if(CRONCPP_BUILD_TESTS)
-   enable_testing()
+  enable_testing()
   add_subdirectory(test)
 endif()
 

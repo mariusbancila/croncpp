@@ -39,7 +39,7 @@ void check_next(std::string_view expr, std::string_view time, std::string_view e
    REQUIRE(value == expected);
 }
 */
-void check_next(std::string_view expr, std::string_view time, std::string_view expected)
+void check_next(STRING_VIEW expr, STRING_VIEW time, STRING_VIEW expected)
 {
    auto cex = make_cron(expr);
 
