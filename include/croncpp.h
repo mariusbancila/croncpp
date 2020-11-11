@@ -11,12 +11,12 @@
 
 #if __cplusplus > 201402L
 #include <string_view>
-#define IS_CPP17
+#define CRONCPP_IS_CPP17
 #endif
 
 namespace cron
 {
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
    #define  HAS_STRING_VIEW
    #define  STRING_VIEW       std::string_view
    #define  STRING_VIEW_NPOS  std::string_view::npos
@@ -85,7 +85,7 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
       static const inline std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 #else
@@ -125,7 +125,7 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
       static const inline std::vector<std::string> MONTHS = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 #else
@@ -166,7 +166,7 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
       static const inline std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
 #else
@@ -396,7 +396,7 @@ namespace cron
          {
             if (!utils::contains(field, '/'))
             {
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
                auto[first, last] = detail::make_range(field, minval, maxval);
 #else
                auto range = detail::make_range(field, minval, maxval);
@@ -414,7 +414,7 @@ namespace cron
                if (parts.size() != 2)
                   throw bad_cronexpr("Incrementer must have two fields");
 
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
                auto[first, last] = detail::make_range(parts[0], minval, maxval);
 #else
                auto range = detail::make_range(parts[0], minval, maxval);
@@ -447,7 +447,7 @@ namespace cron
          auto days = utils::to_upper(value);
          auto days_replaced = detail::replace_ordinals(
             days,
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
             Traits::DAYS
 #else
             Traits::DAYS()
@@ -487,7 +487,7 @@ namespace cron
          auto month = utils::to_upper(value);
          auto month_replaced = replace_ordinals(
             month, 
-#ifdef IS_CPP17
+#ifdef CRONCPP_IS_CPP17
             Traits::MONTHS
 #else
             Traits::MONTHS()
