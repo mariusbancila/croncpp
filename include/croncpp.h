@@ -258,13 +258,28 @@ namespace cron
 
       inline std::tm to_tm(STRING_VIEW time)
       {
+         std::tm result;
+#if __cplusplus > 201103L
          std::istringstream str(time.data());
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
 
-         std::tm result;
          str >> std::get_time(&result, "%Y-%m-%d %H:%M:%S");
          if (str.fail()) throw std::runtime_error("Parsing date failed!");
-
+#else
+         int year = 1900;
+         int month = 1;
+         int day = 1;
+         int hour = 0;
+         int minute = 0;
+         int second = 0;
+         sscanf(time.data(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second);
+         result.tm_year = year - 1900;
+         result.tm_mon = month - 1;
+         result.tm_mday = day;
+         result.tm_hour = hour;
+         result.tm_min = minute;
+         result.tm_sec = second;
+#endif
          result.tm_isdst = -1; // DST info not available
 
          return result;
@@ -272,12 +287,18 @@ namespace cron
 
       inline std::string to_string(std::tm const & tm)
       {
+#if __cplusplus > 201103L
          std::ostringstream str;
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
          str << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
          if (str.fail()) throw std::runtime_error("Writing date failed!");
 
          return str.str();
+#else
+         char buff[70] = {0};
+         strftime(buff, sizeof(buff), "%Y-%m-%d %H:%M:%S", &tm);
+         return std::string(buff);
+#endif
       }
 
       inline std::string to_upper(std::string text)
