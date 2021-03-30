@@ -197,6 +197,7 @@ namespace cron
       std::bitset<7>  days_of_week;
       std::bitset<31> days_of_month;
       std::bitset<12> months;
+      std::string     expr;
 
       friend bool operator==(cronexpr const & e1, cronexpr const & e2);
       friend bool operator!=(cronexpr const & e1, cronexpr const & e2);
@@ -206,6 +207,7 @@ namespace cron
                                     std::tm& date,
                                     size_t const dot);
 
+      friend std::string to_cronstr(cronexpr const& cex);
       friend std::string to_string(cronexpr const & cex);
 
       template <typename Traits>
@@ -237,6 +239,11 @@ namespace cron
          cex.days_of_month.to_string() + " " +
          cex.months.to_string() + " " +
          cex.days_of_week.to_string();
+   }
+
+   inline std::string to_cronstr(cronexpr const& cex)
+   {
+      return cex.expr;
    }
 
    namespace utils
@@ -843,6 +850,8 @@ namespace cron
       detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month);
 
       detail::set_cron_month<Traits>(fields[4], cex.months);
+
+      cex.expr = expr;
 
       return cex;
    }

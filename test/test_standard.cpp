@@ -58,6 +58,13 @@ void check_next(STRING_VIEW expr, STRING_VIEW time, STRING_VIEW expected)
    REQUIRE(value == expected);
 }
 
+void check_cron_conv(STRING_VIEW expr)
+{
+   auto cex = make_cron(expr);
+
+   REQUIRE(to_cronstr(cex).compare(expr) == 0);
+}
+
 TEST_CASE("Test simple", "")
 {
    auto cex = make_cron("* * * * * *");
@@ -411,3 +418,31 @@ TEST_CASE("next", "[std]")
    check_next("0 30 23 30 1/3 ?",  "2011-01-30 23:30:00", "2011-04-30 23:30:00");
    check_next("0 30 23 30 1/3 ?",  "2011-04-30 23:30:00", "2011-07-30 23:30:00");    
 }
+
+TEST_CASE("cronexpr", "[std]")
+{
+   check_cron_conv("*/15 * 1-4 * * *");
+   check_cron_conv("0 */2 1-4 * * *");
+   check_cron_conv("* * * * * *");
+   check_cron_conv("10 * * * * *");
+   check_cron_conv("11 * * * * *");
+   check_cron_conv("10-15 * * * * *");
+   check_cron_conv("0 * * * * *");
+   check_cron_conv("0 11 * * * *");
+   check_cron_conv("0 10 * * * *");
+   check_cron_conv("0 0 * * * *");
+   check_cron_conv("0 0 0 * * *");
+   check_cron_conv("* * * 10 * *");
+   check_cron_conv("0 0 0 1 * *");
+   check_cron_conv("0 0 0 31 * *");
+   check_cron_conv("* * * * * 2");
+   check_cron_conv("55 5 * * * *");
+   check_cron_conv("55 * 10 * * *");
+   check_cron_conv("* 5 10 * * *");
+   check_cron_conv("55 * * 3 * *");
+   check_cron_conv("* * * 3 11 *");
+   check_cron_conv("0 0 0 29 2 *");
+   check_cron_conv("0 0 7 ? * MON-FRI");
+   check_cron_conv("0 30 23 30 1/3 ?");
+}
+
