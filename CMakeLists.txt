@@ -38,6 +38,7 @@ target_compile_features(croncpp_options INTERFACE ${CXX_STD_VER})
 
 if(WIN32)
   target_compile_options(croncpp_options INTERFACE "/EHc")
+  target_compile_options(croncpp_options INTERFACE "/Zc:__cplusplus")
   target_compile_definitions(croncpp_options
                              INTERFACE "-D_SCL_SECURE_NO_WARNINGS")
 elseif(APPLE)
