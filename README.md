@@ -124,6 +124,16 @@ catch (cron::bad_cronexpr const & ex)
 }
 ```
 
+There are two functions that convert the `cronexpr` object to a string:
+* `to_cronstr()` returns the original cron expression text from with the object was created.
+* `to_string()` returns a string format of the representation of the cron expression.
+```
+auto cex = make_cron("* * * * * *");
+
+assert(to_cronstr(cex) == "* * * * * *");
+assert(to_string(cex) == "111111111111111111111111111111111111111111111111111111111111 111111111111111111111111111111111111111111111111111111111111 111111111111111111111111 1111111111111111111111111111111 111111111111 1111111");
+```
+
 ## Benchmarks
 
 The following results are the average (in microseconds) for running the benchmark program ten times on Windows and Mac with different compilers (all with release settings).
