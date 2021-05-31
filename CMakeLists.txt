@@ -25,11 +25,11 @@ install(
 
 install(DIRECTORY include/ DESTINATION include)
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(croncpp.cmake COMPATIBILITY AnyNewerVersion)
+write_basic_package_version_file(croncppConfig.cmake COMPATIBILITY AnyNewerVersion)
 
 install(
   EXPORT croncpp_targets
-  FILE croncpp.cmake
+  FILE croncppConfig.cmake
   NAMESPACE croncpp::
   DESTINATION lib/cmake/croncpp)
 
