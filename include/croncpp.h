@@ -311,7 +311,7 @@ namespace cron
       inline std::string to_upper(std::string text)
       {
          std::transform(std::begin(text), std::end(text),
-            std::begin(text), static_cast<int(*)(int)>(std::toupper));
+            std::begin(text), [](auto const c) { return static_cast<char>(std::toupper(c)); });
 
          return text;
       }
