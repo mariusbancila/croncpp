@@ -39,7 +39,7 @@ void check_next(std::string_view expr, std::string_view time, std::string_view e
    REQUIRE(value == expected);
 }
 */
-void check_next(STRING_VIEW expr, STRING_VIEW time, STRING_VIEW expected)
+void check_next(CRONCPP_STRING_VIEW expr, CRONCPP_STRING_VIEW time, CRONCPP_STRING_VIEW expected)
 {
    auto cex = make_cron(expr);
 
@@ -58,7 +58,7 @@ void check_next(STRING_VIEW expr, STRING_VIEW time, STRING_VIEW expected)
    REQUIRE(value == expected);
 }
 
-void check_cron_conv(STRING_VIEW expr)
+void check_cron_conv(CRONCPP_STRING_VIEW expr)
 {
    auto cex = make_cron(expr);
 
@@ -416,7 +416,7 @@ TEST_CASE("next", "[std]")
    check_next("0 0 7 ? * MON-FRI", "2009-09-28 07:00:00", "2009-09-29 07:00:00");
    check_next("0 30 23 30 1/3 ?",  "2010-12-30 00:00:00", "2011-01-30 23:30:00");
    check_next("0 30 23 30 1/3 ?",  "2011-01-30 23:30:00", "2011-04-30 23:30:00");
-   check_next("0 30 23 30 1/3 ?",  "2011-04-30 23:30:00", "2011-07-30 23:30:00");    
+   check_next("0 30 23 30 1/3 ?",  "2011-04-30 23:30:00", "2011-07-30 23:30:00");
 }
 
 TEST_CASE("cronexpr", "[std]")

@@ -18,14 +18,13 @@
 namespace cron
 {
 #ifdef CRONCPP_IS_CPP17
-   #define  HAS_STRING_VIEW
-   #define  STRING_VIEW       std::string_view
-   #define  STRING_VIEW_NPOS  std::string_view::npos
-   #define  CONSTEXPTR        constexpr
+   #define  CRONCPP_STRING_VIEW       std::string_view
+   #define  CRONCPP_STRING_VIEW_NPOS  std::string_view::npos
+   #define  CRONCPP_CONSTEXPTR        constexpr
 #else
-   #define  STRING_VIEW       std::string const &
-   #define  STRING_VIEW_NPOS  std::string::npos
-   #define  CONSTEXPTR
+   #define  CRONCPP_STRING_VIEW       std::string const &
+   #define  CRONCPP_STRING_VIEW_NPOS  std::string::npos
+   #define  CRONCPP_CONSTEXPTR
 #endif
 
    using cron_int  = uint8_t;
@@ -58,7 +57,7 @@ namespace cron
    struct bad_cronexpr : public std::runtime_error
    {
    public:
-      explicit bad_cronexpr(STRING_VIEW message) :
+      explicit bad_cronexpr(CRONCPP_STRING_VIEW message) :
          std::runtime_error(message.data())
       {}
    };
@@ -188,7 +187,7 @@ namespace cron
    class cronexpr;
 
    template <typename Traits = cron_standard_traits>
-   static cronexpr make_cron(STRING_VIEW expr);
+   static cronexpr make_cron(CRONCPP_STRING_VIEW expr);
 
    class cronexpr
    {
@@ -212,7 +211,7 @@ namespace cron
       friend std::string to_string(cronexpr const & cex);
 
       template <typename Traits>
-      friend cronexpr make_cron(STRING_VIEW expr);
+      friend cronexpr make_cron(CRONCPP_STRING_VIEW expr);
    };
 
    inline bool operator==(cronexpr const & e1, cronexpr const & e2)
@@ -264,7 +263,7 @@ namespace cron
 #endif
       }
 
-      inline std::tm to_tm(STRING_VIEW time)
+      inline std::tm to_tm(CRONCPP_STRING_VIEW time)
       {
          std::tm result;
 #if __cplusplus > 201103L
@@ -317,7 +316,7 @@ namespace cron
          return text;
       }
 
-      static std::vector<std::string> split(STRING_VIEW text, char const delimiter)
+      static std::vector<std::string> split(CRONCPP_STRING_VIEW text, char const delimiter)
       {
          std::vector<std::string> tokens;
          std::string token;
@@ -329,16 +328,16 @@ namespace cron
          return tokens;
       }
 
-      CONSTEXPTR inline bool contains(STRING_VIEW text, char const ch) noexcept
+      CRONCPP_CONSTEXPTR inline bool contains(CRONCPP_STRING_VIEW text, char const ch) noexcept
       {
-         return STRING_VIEW_NPOS != text.find_first_of(ch);
+         return CRONCPP_STRING_VIEW_NPOS != text.find_first_of(ch);
       }
    }
 
    namespace detail
    {
 
-      inline cron_int to_cron_int(STRING_VIEW text)
+      inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
       {
          try
          {
@@ -365,7 +364,7 @@ namespace cron
       }
 
       static std::pair<cron_int, cron_int> make_range(
-         STRING_VIEW field,
+         CRONCPP_STRING_VIEW field,
          cron_int const minval,
          cron_int const maxval)
       {
@@ -409,7 +408,7 @@ namespace cron
 
       template <size_t N>
       static void set_cron_field(
-         STRING_VIEW value,
+         CRONCPP_STRING_VIEW value,
          std::bitset<N>& target,
          cron_int const minval,
          cron_int const maxval)
@@ -827,7 +826,7 @@ namespace cron
    }
 
    template <typename Traits>
-   static cronexpr make_cron(STRING_VIEW expr)
+   static cronexpr make_cron(CRONCPP_STRING_VIEW expr)
    {
       cronexpr cex;
 
@@ -837,7 +836,7 @@ namespace cron
       auto fields = utils::split(expr, ' ');
       fields.erase(
          std::remove_if(std::begin(fields), std::end(fields),
-            [](STRING_VIEW s) {return s.empty(); }),
+            [](CRONCPP_STRING_VIEW s) {return s.empty(); }),
          std::end(fields));
       if (fields.size() != 6)
          throw bad_cronexpr("cron expression must have six fields");
