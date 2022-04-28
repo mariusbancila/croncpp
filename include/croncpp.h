@@ -17,14 +17,13 @@
 namespace cron
 {
 #ifdef CRONCPP_IS_CPP17
-   #define  HAS_STRING_VIEW
-   #define  STRING_VIEW       std::string_view
-   #define  STRING_VIEW_NPOS  std::string_view::npos
-   #define  CONSTEXPTR        constexpr
+   #define  CRONCPP_STRING_VIEW       std::string_view
+   #define  CRONCPP_STRING_VIEW_NPOS  std::string_view::npos
+   #define  CRONCPP_CONSTEXPTR        constexpr
 #else
-   #define  STRING_VIEW       std::string const &
-   #define  STRING_VIEW_NPOS  std::string::npos
-   #define  CONSTEXPTR
+   #define  CRONCPP_STRING_VIEW       std::string const &
+   #define  CRONCPP_STRING_VIEW_NPOS  std::string::npos
+   #define  CRONCPP_CONSTEXPTR
 #endif
 
    using cron_int  = uint8_t;
@@ -33,7 +32,7 @@ namespace cron
 
    constexpr size_t INVALID_INDEX = static_cast<size_t>(-1);
 
-   class cronexpr;   
+   class cronexpr;
 
    namespace detail
    {
@@ -57,7 +56,7 @@ namespace cron
    struct bad_cronexpr : public std::runtime_error
    {
    public:
-      explicit bad_cronexpr(STRING_VIEW message) :
+      explicit bad_cronexpr(CRONCPP_STRING_VIEW message) :
          std::runtime_error(message.data())
       {}
    };
@@ -94,7 +93,7 @@ namespace cron
          static std::vector<std::string> days = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
          return days;
       }
-      
+
       static std::vector<std::string>& MONTHS()
       {
          static std::vector<std::string> months = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
@@ -187,7 +186,7 @@ namespace cron
    class cronexpr;
 
    template <typename Traits = cron_standard_traits>
-   static cronexpr make_cron(STRING_VIEW expr);
+   static cronexpr make_cron(CRONCPP_STRING_VIEW expr);
 
    class cronexpr
    {
@@ -211,7 +210,7 @@ namespace cron
       friend std::string to_string(cronexpr const & cex);
 
       template <typename Traits>
-      friend cronexpr make_cron(STRING_VIEW expr);
+      friend cronexpr make_cron(CRONCPP_STRING_VIEW expr);
    };
 
    inline bool operator==(cronexpr const & e1, cronexpr const & e2)
@@ -260,10 +259,10 @@ namespace cron
          return 0 == err ? out : nullptr;
 #else
          return localtime_r(date, out);
-#endif   
+#endif
       }
 
-      inline std::tm to_tm(STRING_VIEW time)
+      inline std::tm to_tm(CRONCPP_STRING_VIEW time)
       {
          std::tm result;
 #if __cplusplus > 201103L
@@ -316,7 +315,7 @@ namespace cron
          return text;
       }
 
-      static std::vector<std::string> split(STRING_VIEW text, char const delimiter)
+      static std::vector<std::string> split(CRONCPP_STRING_VIEW text, char const delimiter)
       {
          std::vector<std::string> tokens;
          std::string token;
@@ -328,16 +327,16 @@ namespace cron
          return tokens;
       }
 
-      CONSTEXPTR inline bool contains(STRING_VIEW text, char const ch) noexcept
+      CRONCPP_CONSTEXPTR inline bool contains(CRONCPP_STRING_VIEW text, char const ch) noexcept
       {
-         return STRING_VIEW_NPOS != text.find_first_of(ch);
+         return CRONCPP_STRING_VIEW_NPOS != text.find_first_of(ch);
       }
    }
 
    namespace detail
    {
 
-      inline cron_int to_cron_int(STRING_VIEW text)
+      inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
       {
          try
          {
@@ -350,7 +349,7 @@ namespace cron
       }
 
       static std::string replace_ordinals(
-         std::string text, 
+         std::string text,
          std::vector<std::string> const & replacement)
       {
          for (size_t i = 0; i < replacement.size(); ++i)
@@ -364,7 +363,7 @@ namespace cron
       }
 
       static std::pair<cron_int, cron_int> make_range(
-         STRING_VIEW field,
+         CRONCPP_STRING_VIEW field,
          cron_int const minval,
          cron_int const maxval)
       {
@@ -374,7 +373,7 @@ namespace cron
          {
             first = minval;
             last = maxval;
-         } 
+         }
          else if (!utils::contains(field, '-'))
          {
             first = to_cron_int(field);
@@ -408,7 +407,7 @@ namespace cron
 
       template <size_t N>
       static void set_cron_field(
-         STRING_VIEW value,
+         CRONCPP_STRING_VIEW value,
          std::bitset<N>& target,
          cron_int const minval,
          cron_int const maxval)
@@ -436,7 +435,7 @@ namespace cron
                   target.set(i);
                }
             }
-            else 
+            else
             {
                auto parts = utils::split(field, '/');
                if (parts.size() != 2)
@@ -486,10 +485,10 @@ namespace cron
             days_replaced[0] = '*';
 
          set_cron_field(
-            days_replaced, 
-            target, 
+            days_replaced,
+            target,
             Traits::CRON_MIN_DAYS_OF_WEEK,
-            Traits::CRON_MAX_DAYS_OF_WEEK);         
+            Traits::CRON_MAX_DAYS_OF_WEEK);
       }
 
       template <typename Traits>
@@ -501,8 +500,8 @@ namespace cron
             value[0] = '*';
 
          set_cron_field(
-            value, 
-            target, 
+            value,
+            target,
             Traits::CRON_MIN_DAYS_OF_MONTH,
             Traits::CRON_MAX_DAYS_OF_MONTH);
       }
@@ -514,7 +513,7 @@ namespace cron
       {
          auto month = utils::to_upper(value);
          auto month_replaced = replace_ordinals(
-            month, 
+            month,
 #ifdef CRONCPP_IS_CPP17
             Traits::MONTHS
 #else
@@ -523,8 +522,8 @@ namespace cron
          );
 
          set_cron_field(
-            month_replaced, 
-            target, 
+            month_replaced,
+            target,
             Traits::CRON_MIN_MONTHS,
             Traits::CRON_MAX_MONTHS);
       }
@@ -545,8 +544,8 @@ namespace cron
       }
 
       inline void add_to_field(
-         std::tm& date, 
-         cron_field const field, 
+         std::tm& date,
+         cron_field const field,
          int const val)
       {
          switch (field)
@@ -577,8 +576,8 @@ namespace cron
       }
 
       inline void set_field(
-         std::tm& date, 
-         cron_field const field, 
+         std::tm& date,
+         cron_field const field,
          int const val)
       {
          switch (field)
@@ -611,7 +610,7 @@ namespace cron
       }
 
       inline void reset_field(
-         std::tm& date, 
+         std::tm& date,
          cron_field const field)
       {
          switch (field)
@@ -644,7 +643,7 @@ namespace cron
       }
 
       inline void reset_all_fields(
-         std::tm& date, 
+         std::tm& date,
          std::bitset<7> const & marked_fields)
       {
          for (size_t i = 0; i < marked_fields.size(); ++i)
@@ -655,7 +654,7 @@ namespace cron
       }
 
       inline void mark_field(
-         std::bitset<7> & orders, 
+         std::bitset<7> & orders,
          cron_field const field)
       {
          if (!orders.test(static_cast<size_t>(field)))
@@ -667,7 +666,7 @@ namespace cron
          std::bitset<N> const & target,
          std::tm& date,
          unsigned int const minimum,
-         unsigned int const maximum, 
+         unsigned int const maximum,
          unsigned int const value,
          cron_field const field,
          cron_field const next_field,
@@ -689,7 +688,7 @@ namespace cron
 
          return next_value;
       }
-      
+
       template <typename Traits>
       static size_t find_next_day(
          std::tm& date,
@@ -703,7 +702,7 @@ namespace cron
          unsigned int maximum = 366;
          while (
             (!days_of_month.test(day_of_month - Traits::CRON_MIN_DAYS_OF_MONTH) ||
-            !days_of_week.test(day_of_week - Traits::CRON_MIN_DAYS_OF_WEEK)) 
+            !days_of_week.test(day_of_week - Traits::CRON_MIN_DAYS_OF_WEEK))
             && count++ < maximum)
          {
             add_to_field(date, cron_field::day_of_month, 1);
@@ -733,7 +732,7 @@ namespace cron
             date,
             Traits::CRON_MIN_SECONDS,
             Traits::CRON_MAX_SECONDS,
-            second, 
+            second,
             cron_field::second,
             cron_field::minute,
             empty_list);
@@ -822,11 +821,11 @@ namespace cron
          }
 
          return res;
-      }      
+      }
    }
 
    template <typename Traits>
-   static cronexpr make_cron(STRING_VIEW expr)
+   static cronexpr make_cron(CRONCPP_STRING_VIEW expr)
    {
       cronexpr cex;
 
@@ -836,7 +835,7 @@ namespace cron
       auto fields = utils::split(expr, ' ');
       fields.erase(
          std::remove_if(std::begin(fields), std::end(fields),
-            [](STRING_VIEW s) {return s.empty(); }),
+            [](CRONCPP_STRING_VIEW s) {return s.empty(); }),
          std::end(fields));
       if (fields.size() != 6)
          throw bad_cronexpr("cron expression must have six fields");
@@ -902,5 +901,5 @@ namespace cron
       }
 
       return utils::tm_to_time(*dt);
-   }   
+   }
 }
