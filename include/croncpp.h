@@ -8,6 +8,7 @@
 #include <ctime>
 #include <iomanip>
 #include <algorithm>
+#include <chrono>
 
 #if __cplusplus > 201402L
 #include <string_view>
@@ -902,4 +903,9 @@ namespace cron
 
       return utils::tm_to_time(*dt);
    }
+
+  template <typename Traits = cron_standard_traits>
+  static std::chrono::system_clock::time_point cron_next(cronexpr const & cex, std::chrono::system_clock::time_point const & time_point) {
+     return std::chrono::system_clock::from_time_t(cron_next<Traits>(cex, std::chrono::system_clock::to_time_t(time_point)));
+  }
 }
