@@ -563,9 +563,11 @@ namespace cron
          case cron_field::day_of_week:
          case cron_field::day_of_month:
             date.tm_mday += val;
+            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon += val;
+            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year += val;
@@ -597,9 +599,11 @@ namespace cron
             break;
          case cron_field::day_of_month:
             date.tm_mday = val;
+            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon = val;
+            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year = val;
@@ -630,9 +634,11 @@ namespace cron
             break;
          case cron_field::day_of_month:
             date.tm_mday = 1;
+            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon = 0;
+            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year = 0;
