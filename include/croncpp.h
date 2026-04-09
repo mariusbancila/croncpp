@@ -914,4 +914,18 @@ namespace cron
   static std::chrono::system_clock::time_point cron_next(cronexpr const & cex, std::chrono::system_clock::time_point const & time_point) {
      return std::chrono::system_clock::from_time_t(cron_next<Traits>(cex, std::chrono::system_clock::to_time_t(time_point)));
   }
+
+  template <typename Traits = cron_standard_traits>
+  static std::chrono::system_clock::time_point cron_next_ceil(cronexpr const & cex, std::chrono::system_clock::time_point const & time_point) {
+     // std::chrono::system_clock::to_time_t truncates fractional seconds.
+     // If the input time_point represents a known cron trigger time but is
+     // slightly below that exact second, truncation can move it back one
+     // second and cause cron_next to return the current trigger instead of
+     // the next one.
+     auto tt = std::chrono::system_clock::to_time_t(time_point);
+     if (std::chrono::system_clock::from_time_t(tt) < time_point) {
+        ++tt;
+     }
+     return std::chrono::system_clock::from_time_t(cron_next<Traits>(cex, tt));
+  }
 }
