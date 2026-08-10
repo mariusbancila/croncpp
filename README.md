@@ -43,6 +43,8 @@ The special characters have the following meaning:
 | `W` | weekday | the weekday nearest to the given day |
 | `#` | nth |  specify the Nth day of the month |
 
+**Note:** the `L`, `W` and `#` special characters are described here for completeness but are **not implemented** by croncpp. An expression that uses one of them is rejected by `make_cron()` with a `bad_cronexpr` exception.
+
 Examples: 
 
 | CRON | Description |
@@ -55,7 +57,6 @@ Examples:
 | 0 0/5 14 * * ? | Every 5 minutes starting at 2 PM and ending at 2:55 PM, every day |
 | 0 10,44 14 ? 3 WED | 2:10 PM and at 2:44 PM every Wednesday of March |
 | 0 15 10 ? * MON-FRI | 10:15 AM every Monday, Tuesday, Wednesday, Thursday and Friday |
-| 0 15 10 L * ? | 10:15 AM on the last day of every month |
 | 0 0 12 1/5 * ? | 12 PM every 5 days every month, starting on the first day of the month |
 | 0 11 11 11 11 ? | Every November 11th at 11:11 AM |
 
