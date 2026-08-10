@@ -113,3 +113,31 @@ TEST_CASE("oracle: invalid days of week", "[oracle]")
    CRON_EXPECT_EXCEPT("* * * * * 0");
    CRON_EXPECT_EXCEPT("* * * * * 0-8");
 }
+
+TEST_CASE("oracle: every day of the week is reachable", "[oracle]")
+{
+   // 2023-09-03 is a Sunday; oracle numbers the days 1 (SUN) to 7 (SAT)
+   char const * const days[] = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
+   char const * const expected[] = {
+      "2023-09-03 12:00:00",
+      "2023-09-04 12:00:00",
+      "2023-09-05 12:00:00",
+      "2023-09-06 12:00:00",
+      "2023-09-07 12:00:00",
+      "2023-09-08 12:00:00",
+      "2023-09-09 12:00:00",
+   };
+
+   for (int day = 0; day < 7; ++day)
+   {
+      auto const named = make_cron<cron_oracle_traits>(
+         std::string("0 0 12 ? * ") + days[day]);
+      auto const numbered = make_cron<cron_oracle_traits>(
+         "0 0 12 ? * " + std::to_string(day + 1));
+
+      auto const base = utils::to_tm("2023-09-03 00:00:00");
+
+      REQUIRE(utils::to_string(cron_next<cron_oracle_traits>(named, base)) == expected[day]);
+      REQUIRE(utils::to_string(cron_next<cron_oracle_traits>(numbered, base)) == expected[day]);
+   }
+}
