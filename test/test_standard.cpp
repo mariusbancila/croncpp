@@ -374,6 +374,33 @@ TEST_CASE("standard: invalid days of week", "[std]")
    CRON_EXPECT_EXCEPT("* * * * * /2*-");
 }
 
+TEST_CASE("standard: unsupported special characters", "[std]")
+{
+   CRON_EXPECT_EXCEPT("0 0 12 L * ?");
+   CRON_EXPECT_EXCEPT("0 15 10 L * ?");
+   CRON_EXPECT_EXCEPT("0 0 12 15W * ?");
+   CRON_EXPECT_EXCEPT("0 0 12 LW * ?");
+   CRON_EXPECT_EXCEPT("0 0 12 ? * 5L");
+   CRON_EXPECT_EXCEPT("0 0 12 ? * 6#3");
+}
+
+TEST_CASE("standard: trailing garbage is not ignored", "[std]")
+{
+   CRON_EXPECT_EXCEPT("0 0 1abc * * *");
+   CRON_EXPECT_EXCEPT("0 0 1 2x * *");
+   CRON_EXPECT_EXCEPT("0 0 1-2x * * *");
+   CRON_EXPECT_EXCEPT("0 0 * * * 1x");
+   CRON_EXPECT_EXCEPT("0 0/2x * * * *");
+}
+
+TEST_CASE("standard: field values are not truncated", "[std]")
+{
+   CRON_EXPECT_EXCEPT("0 0 256 * * *");
+   CRON_EXPECT_EXCEPT("0 0 512 * * *");
+   CRON_EXPECT_EXCEPT("0 0 0 300 * *");
+   CRON_EXPECT_EXCEPT("0 0 99999999999999999999 * * *");
+}
+
 TEST_CASE("next", "[std]")
 {
    check_next("*/15 * 1-4 * * *",  "2012-07-01 09:53:50", "2012-07-02 01:00:00");

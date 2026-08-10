@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <chrono>
+#include <limits>
 
 #if __cplusplus > 201402L
 #include <string_view>
@@ -339,11 +340,35 @@ namespace cron
 
       inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
       {
+         if (text.empty())
+            throw bad_cronexpr("Cron field value cannot be empty");
+
+         for (auto const ch : text)
+         {
+            if (ch < '0' || ch > '9')
+            {
+               if (ch == 'L' || ch == 'W' || ch == '#')
+                  throw bad_cronexpr(
+                     std::string("Special character '") + ch + "' is not supported");
+
+               throw bad_cronexpr(
+                  "Invalid character in cron field: " + std::string(text));
+            }
+         }
+
          try
          {
-            return static_cast<cron_int>(std::stoul(text.data()));
+            auto const value = std::stoul(std::string(text));
+            if (value > static_cast<unsigned long>((std::numeric_limits<cron_int>::max)()))
+               throw bad_cronexpr("Cron field value is out of range");
+
+            return static_cast<cron_int>(value);
          }
-         catch (std::exception const & ex)
+         catch (std::invalid_argument const & ex)
+         {
+            throw bad_cronexpr(ex.what());
+         }
+         catch (std::out_of_range const & ex)
          {
             throw bad_cronexpr(ex.what());
          }
