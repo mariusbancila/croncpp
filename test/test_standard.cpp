@@ -476,3 +476,16 @@ TEST_CASE("cronexpr", "[std]")
    check_cron_conv("0 30 23 30 1/3 ?");
 }
 
+TEST_CASE("standard: default constructed cronexpr is empty", "[std]")
+{
+   cronexpr cex;
+
+   REQUIRE(cex.empty());
+   REQUIRE(!make_cron("* * * * * *").empty());
+
+   auto date = utils::to_tm("2012-07-01 09:53:50");
+
+   REQUIRE_THROWS_AS(cron_next(cex, date), bad_cronexpr);
+   REQUIRE_THROWS_AS(cron_next(cex, utils::tm_to_time(date)), bad_cronexpr);
+}
+
