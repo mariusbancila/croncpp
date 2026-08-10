@@ -744,9 +744,13 @@ namespace cron
       {
          unsigned int count = 0;
          unsigned int maximum = 366;
+         // day_of_week comes from std::tm::tm_wday and is always 0 (Sunday) to
+         // 6 (Saturday), whatever the traits are. It is already the bit index,
+         // because the cron value of Sunday is CRON_MIN_DAYS_OF_WEEK and the
+         // bits are set at value - CRON_MIN_DAYS_OF_WEEK.
          while (
             (!days_of_month.test(day_of_month - Traits::CRON_MIN_DAYS_OF_MONTH) ||
-            !days_of_week.test(day_of_week - Traits::CRON_MIN_DAYS_OF_WEEK))
+            !days_of_week.test(day_of_week))
             && count++ < maximum)
          {
             add_to_field(date, cron_field::day_of_month, 1);
