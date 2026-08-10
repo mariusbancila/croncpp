@@ -212,6 +212,18 @@ namespace cron
 
       template <typename Traits>
       friend cronexpr make_cron(CRONCPP_STRING_VIEW expr);
+
+   public:
+      bool empty() const noexcept
+      {
+         return
+            seconds.none() ||
+            minutes.none() ||
+            hours.none() ||
+            days_of_week.none() ||
+            days_of_month.none() ||
+            months.none();
+      }
    };
 
    inline bool operator==(cronexpr const & e1, cronexpr const & e2)
@@ -865,6 +877,9 @@ namespace cron
    template <typename Traits = cron_standard_traits>
    static std::tm cron_next(cronexpr const & cex, std::tm date)
    {
+      if (cex.empty())
+         throw bad_cronexpr("Invalid empty cron expression");
+
       time_t original = utils::tm_to_time(date);
       if (INVALID_TIME == original) return {};
 
@@ -887,6 +902,9 @@ namespace cron
    template <typename Traits = cron_standard_traits>
    static std::time_t cron_next(cronexpr const & cex, std::time_t const & date)
    {
+      if (cex.empty())
+         throw bad_cronexpr("Invalid empty cron expression");
+
       std::tm val;
       std::tm* dt = utils::time_to_tm(&date, &val);
       if (dt == nullptr) return INVALID_TIME;
