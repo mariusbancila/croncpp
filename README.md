@@ -108,6 +108,24 @@ catch (cron::bad_cronexpr const & ex)
 }
 ```
 
+A `std::chrono::system_clock::time_point` overload is also available, but because `cron_next()` converts the time point to `time_t` using `to_time_t()`, fractional seconds are truncated.
+If you are working from a known trigger instant and a sub-second drift could move the time point below the exact second, use `cron_next_ceil()` to round up to the next whole second before computing the next occurrence.
+
+```
+try
+{
+   auto cron = cron::make_cron("* 0/5 * * * ?");
+
+   auto now = std::chrono::system_clock::now();
+   auto next = cron::cron_next(cron, now);
+   auto next_ceil = cron::cron_next_ceil(cron, now);
+}
+catch (cron::bad_cronexpr const & ex)
+{
+   std::cerr << ex.what() << '\n';
+}
+```
+
 When you use these functions as shown above you implicitly use the standard supported values for the fields, as described in the first section. However, you can use any other settings. The ones provided with the library are called `cron_standard_traits`, `cron_oracle_traits` and `cron_quartz_traits` (coresponding to the aforementioned settings).
 
 ```

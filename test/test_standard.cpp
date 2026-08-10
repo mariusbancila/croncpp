@@ -65,6 +65,19 @@ void check_cron_conv(CRONCPP_STRING_VIEW expr)
    REQUIRE(to_cronstr(cex).compare(expr) == 0);
 }
 
+TEST_CASE("standard: cron_next_ceil rounds up time_point when subsecond drift is present", "[std]")
+{
+   auto cex = make_cron("0 0 12 * * *");
+   auto base_time = utils::to_tm("2018-08-08 12:00:00");
+   auto tp = std::chrono::system_clock::from_time_t(utils::tm_to_time(base_time)) - std::chrono::milliseconds(50);
+
+   auto next = cron_next(cex, tp);
+   auto next_ceil = cron_next_ceil(cex, tp);
+
+   REQUIRE(std::chrono::system_clock::to_time_t(next) == utils::tm_to_time(base_time));
+   REQUIRE(std::chrono::system_clock::to_time_t(next_ceil) == utils::tm_to_time(utils::to_tm("2018-08-09 12:00:00")));
+}
+
 TEST_CASE("Test simple", "")
 {
    auto cex = make_cron("* * * * * *");
