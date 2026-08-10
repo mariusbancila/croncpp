@@ -1,6 +1,6 @@
 # croncpp
 
-croncpp is a C++11/14/17 header-only cross-platform library for handling CRON expressions. It implements two basic operations: parsing an expression and computing the next occurence of the scheduled time.
+**croncpp** is a C++ header-only cross-platform library for handling CRON expressions. Works with any compiler that supports C++11 or anything newer. It implements two basic operations: parsing an expression and computing the next occurence of the scheduled time.
 
 [![CI](https://github.com/mariusbancila/croncpp/actions/workflows/ci.yml/badge.svg)](https://github.com/mariusbancila/croncpp/actions/workflows/ci.yml)
 
