@@ -74,8 +74,10 @@ TEST_CASE("standard: cron_next_ceil rounds up time_point when subsecond drift is
    auto next = cron_next(cex, tp);
    auto next_ceil = cron_next_ceil(cex, tp);
 
+   auto expected_ceil = utils::to_tm("2018-08-09 12:00:00");
+
    REQUIRE(std::chrono::system_clock::to_time_t(next) == utils::tm_to_time(base_time));
-   REQUIRE(std::chrono::system_clock::to_time_t(next_ceil) == utils::tm_to_time(utils::to_tm("2018-08-09 12:00:00")));
+   REQUIRE(std::chrono::system_clock::to_time_t(next_ceil) == utils::tm_to_time(expected_ceil));
 }
 
 TEST_CASE("Test simple", "")
