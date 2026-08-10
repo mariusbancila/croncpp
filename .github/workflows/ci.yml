@@ -17,7 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        std: [cxx_std_11, cxx_std_14, cxx_std_17]
+        # cxx_std_26 is left out on purpose: compilers that do not advertise it
+        # make target_compile_features fail to configure, rather than skip
+        std: [cxx_std_11, cxx_std_14, cxx_std_17, cxx_std_20, cxx_std_23]
 
     steps:
       - uses: actions/checkout@v4
