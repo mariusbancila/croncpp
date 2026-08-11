@@ -386,15 +386,43 @@ namespace cron
          }
       }
 
+      inline bool is_field_separator(char const ch)
+      {
+         return ch == ',' || ch == '-' || ch == '/';
+      }
+
       static std::string replace_ordinals(
          std::string text,
          std::vector<std::string> const & replacement)
       {
          for (size_t i = 0; i < replacement.size(); ++i)
          {
-            auto pos = text.find(replacement[i]);
-            if (std::string::npos != pos)
-               text.replace(pos, 3 ,std::to_string(i));
+            std::string const & name = replacement[i];
+            if (name.empty()) continue;
+
+            std::string const value = std::to_string(i);
+
+            size_t pos = text.find(name);
+            while (std::string::npos != pos)
+            {
+               // Only a name standing on its own is a name. Replacing it
+               // wherever it appears turns "JAN1" into "11", which is a
+               // perfectly good month number and quietly means November.
+               size_t const end = pos + name.size();
+
+               bool const at_start = pos == 0 || is_field_separator(text[pos - 1]);
+               bool const at_end = end == text.size() || is_field_separator(text[end]);
+
+               if (at_start && at_end)
+               {
+                  text.replace(pos, name.size(), value);
+                  pos = text.find(name, pos + value.size());
+               }
+               else
+               {
+                  pos = text.find(name, pos + 1);
+               }
+            }
          }
 
          return text;
@@ -579,6 +607,35 @@ namespace cron
          }
 
          return INVALID_INDEX;
+      }
+
+      // Reports whether any day the expression asks for can occur in any month
+      // it asks for. February is measured as a leap year, so the 29th counts
+      // as reachable and the 30th does not.
+      //
+      // Both bitsets are indexed from the traits minimum, and every traits
+      // type numbers January and the first of the month as that minimum, so
+      // bit 0 is January and day 1 whatever the traits are.
+      inline bool has_reachable_date(
+         std::bitset<31> const & days_of_month,
+         std::bitset<12> const & months)
+      {
+         static int const last_day_of[12] =
+            { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+         for (size_t month = 0; month < months.size(); ++month)
+         {
+            if (!months.test(month)) continue;
+
+            for (size_t day = 0; day < days_of_month.size(); ++day)
+            {
+               if (days_of_month.test(day) &&
+                   static_cast<int>(day) + 1 <= last_day_of[month])
+                  return true;
+            }
+         }
+
+         return false;
       }
 
       inline int field_value(
@@ -985,6 +1042,12 @@ namespace cron
       detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month);
 
       detail::set_cron_month<Traits>(fields[4], cex.months);
+
+      // A date such as the 31st of February never arrives, so there is no
+      // next occurrence to compute and the expression is rejected here rather
+      // than leaving the caller to make sense of a search that never succeeds.
+      if (!detail::has_reachable_date(cex.days_of_month, cex.months))
+         throw bad_cronexpr("Date specified by the expression is invalid");
 
       cex.expr = expr;
 

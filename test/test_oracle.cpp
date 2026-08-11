@@ -114,6 +114,29 @@ TEST_CASE("oracle: invalid days of week", "[oracle]")
    CRON_EXPECT_EXCEPT("* * * * * 0-8");
 }
 
+TEST_CASE("oracle: month and day names have to stand on their own", "[oracle]")
+{
+   CRON_EXPECT_EXCEPT("0 0 0 1 JAN1 *");
+   CRON_EXPECT_EXCEPT("* * * * * MON1");
+
+   // oracle numbers the months from 0, so JAN is 0 and DEC is 11
+   CRON_ORCL_EQUAL("* * * * JAN *", "* * * * 0 *");
+   CRON_ORCL_EQUAL("* * * * JAN,DEC *", "* * * * 0,11 *");
+   CRON_ORCL_EQUAL("* * * * * MON-FRI", "* * * * * 2-6");
+}
+
+TEST_CASE("oracle: dates that never occur", "[oracle]")
+{
+   // oracle numbers the months 0 (January) to 11 (December), so February is 1
+   CRON_EXPECT_EXCEPT("0 0 5 31 1 ?");
+   CRON_EXPECT_EXCEPT("0 0 0 30 1 *");
+   CRON_EXPECT_EXCEPT("0 0 0 31 3 *"); // April
+
+   REQUIRE_NOTHROW(make_cron<cron_oracle_traits>("0 0 0 29 1 *")); // leap day
+   REQUIRE_NOTHROW(make_cron<cron_oracle_traits>("0 0 0 31 0 *")); // January
+   REQUIRE_NOTHROW(make_cron<cron_oracle_traits>("0 0 0 31 2 *")); // March
+}
+
 TEST_CASE("oracle: every day of the week is reachable", "[oracle]")
 {
    // 2023-09-03 is a Sunday; oracle numbers the days 1 (SUN) to 7 (SAT)
