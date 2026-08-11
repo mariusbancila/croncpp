@@ -581,6 +581,24 @@ namespace cron
          return INVALID_INDEX;
       }
 
+      inline int field_value(
+         std::tm const & date,
+         cron_field const field)
+      {
+         switch (field)
+         {
+         case cron_field::second:       return date.tm_sec;
+         case cron_field::minute:       return date.tm_min;
+         case cron_field::hour_of_day:  return date.tm_hour;
+         case cron_field::day_of_week:  return date.tm_wday;
+         case cron_field::day_of_month: return date.tm_mday;
+         case cron_field::month:        return date.tm_mon;
+         case cron_field::year:         return date.tm_year;
+         }
+
+         return -1;
+      }
+
       inline void add_to_field(
          std::tm& date,
          cron_field const field,
@@ -600,16 +618,19 @@ namespace cron
          case cron_field::day_of_week:
          case cron_field::day_of_month:
             date.tm_mday += val;
-            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon += val;
-            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year += val;
             break;
          }
+
+         // whatever the field, the time that comes out may fall on the other
+         // side of a DST transition from the one that went in, so the flag is
+         // no longer known and mktime has to work it out
+         date.tm_isdst = -1;
 
          if (INVALID_TIME == utils::tm_to_time(date))
             throw bad_cronexpr("Invalid time expression");
@@ -636,16 +657,16 @@ namespace cron
             break;
          case cron_field::day_of_month:
             date.tm_mday = val;
-            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon = val;
-            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year = val;
             break;
          }
+
+         date.tm_isdst = -1;
 
          if (INVALID_TIME == utils::tm_to_time(date))
             throw bad_cronexpr("Invalid time expression");
@@ -671,16 +692,16 @@ namespace cron
             break;
          case cron_field::day_of_month:
             date.tm_mday = 1;
-            date.tm_isdst = -1;
             break;
          case cron_field::month:
             date.tm_mon = 0;
-            date.tm_isdst = -1;
             break;
          case cron_field::year:
             date.tm_year = 0;
             break;
          }
+
+         date.tm_isdst = -1;
 
          if (INVALID_TIME == utils::tm_to_time(date))
             throw bad_cronexpr("Invalid time expression");
@@ -728,6 +749,24 @@ namespace cron
          {
             set_field(date, field, static_cast<int>(next_value));
             reset_all_fields(date, marked_fields);
+
+            // The value asked for may not exist on this day: when the clock
+            // jumps forward there is no 02:30 at all, and mktime answers with
+            // some other time. Asking again would never make progress, so move
+            // on to the next larger field instead.
+            if (INVALID_INDEX != next_value &&
+                field_value(date, field) != static_cast<int>(next_value))
+            {
+               add_to_field(date, next_field, 1);
+               reset_field(date, field);
+
+               next_value = next_set_bit(target, minimum, maximum, 0);
+               if (INVALID_INDEX != next_value)
+               {
+                  set_field(date, field, static_cast<int>(next_value));
+                  reset_all_fields(date, marked_fields);
+               }
+            }
          }
 
          return next_value;
@@ -870,6 +909,47 @@ namespace cron
 
          return res;
       }
+
+      // The largest shift a DST transition applies to the clock.
+      // It bounds the search below, which can only fail to move forward while it is inside such a transition.
+      constexpr std::time_t CRON_MAX_DST_SHIFT = 2 * 60 * 60;
+
+      // Finds the first time matching the expression that is strictly later
+      // than the one given. find_next works on a local std::tm, and across a
+      // DST transition mktime can map that local time onto an instant at or
+      // before the one the search started from: the local clock moves forward
+      // while the instant it names does not. The result is therefore checked
+      // and the search restarted a second later until it really is in the
+      // future, which also keeps a caller looping on cron_next from spinning
+      // on the same value.
+      template <typename Traits>
+      static std::time_t find_next_after(
+         cronexpr const & cex,
+         std::time_t const original,
+         std::tm & result)
+      {
+         for (std::time_t start = original; start - original <= CRON_MAX_DST_SHIFT; ++start)
+         {
+            std::tm date;
+            if (utils::time_to_tm(&start, &date) == nullptr)
+               return INVALID_TIME;
+
+            if (!find_next<Traits>(cex, date, date.tm_year))
+               return INVALID_TIME;
+
+            std::time_t const calculated = utils::tm_to_time(date);
+            if (INVALID_TIME == calculated)
+               return INVALID_TIME;
+
+            if (calculated > original)
+            {
+               result = date;
+               return calculated;
+            }
+         }
+
+         return INVALID_TIME;
+      }
    }
 
    template <typename Traits>
@@ -909,23 +989,14 @@ namespace cron
       if (cex.empty())
          throw bad_cronexpr("Invalid empty cron expression");
 
-      time_t original = utils::tm_to_time(date);
+      std::time_t const original = utils::tm_to_time(date);
       if (INVALID_TIME == original) return {};
 
-      if (!detail::find_next<Traits>(cex, date, date.tm_year))
+      std::tm result;
+      if (INVALID_TIME == detail::find_next_after<Traits>(cex, original, result))
          return {};
 
-      time_t calculated = utils::tm_to_time(date);
-      if (INVALID_TIME == calculated) return {};
-
-      if (calculated == original)
-      {
-         add_to_field(date, detail::cron_field::second, 1);
-         if (!detail::find_next<Traits>(cex, date, date.tm_year))
-            return {};
-      }
-
-      return date;
+      return result;
    }
 
    template <typename Traits = cron_standard_traits>
@@ -934,27 +1005,8 @@ namespace cron
       if (cex.empty())
          throw bad_cronexpr("Invalid empty cron expression");
 
-      std::tm val;
-      std::tm* dt = utils::time_to_tm(&date, &val);
-      if (dt == nullptr) return INVALID_TIME;
-
-      time_t original = utils::tm_to_time(*dt);
-      if (INVALID_TIME == original) return INVALID_TIME;
-
-      if(!detail::find_next<Traits>(cex, *dt, dt->tm_year))
-         return INVALID_TIME;
-
-      time_t calculated = utils::tm_to_time(*dt);
-      if (INVALID_TIME == calculated) return calculated;
-
-      if (calculated == original)
-      {
-         add_to_field(*dt, detail::cron_field::second, 1);
-         if(!detail::find_next<Traits>(cex, *dt, dt->tm_year))
-            return INVALID_TIME;
-      }
-
-      return utils::tm_to_time(*dt);
+      std::tm result;
+      return detail::find_next_after<Traits>(cex, date, result);
    }
 
   template <typename Traits = cron_standard_traits>
