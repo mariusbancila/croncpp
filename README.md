@@ -169,7 +169,10 @@ auto tm  = cron::utils::to_tm("2025-03-09 01:00:00");
 assert(cron::utils::to_string(cron::cron_next(cex, tm)) == "2025-03-10 02:30:00");
 ```
 
-**When the clock goes back**, some local times occur twice, and the two are different instants an hour apart. Which of them `cron_next` returns depends on how the platform's `mktime` resolves an ambiguous local time, and that differs between implementations. croncpp does not attempt to hide the difference. What it does guarantee is that the result is a time matching the expression that is **strictly later than the one asked about**, so a caller that repeatedly feeds the previous result back in always makes progress and never repeats a value.
+**When the clock goes back**, some local times occur twice, and the two are different instants an hour apart. Which of them `cron_next` returns depends on how the platform's `mktime` resolves an ambiguous local time, and that differs between implementations. croncpp does not attempt to hide the difference. What it does guarantee is that
+
+* the result is a time matching the expression that is **strictly later than the one asked about**, so a caller that repeatedly feeds the previous result back in always makes progress and never repeats a value, and
+* the `std::tm`, `std::time_t` and `std::chrono::system_clock::time_point` overloads all name the **same instant** for the same question, including inside the repeated hour.
 
 ## Benchmarks
 

@@ -943,7 +943,15 @@ namespace cron
 
             if (calculated > original)
             {
-               result = date;
+               // Derive the calendar time back from the instant rather than
+               // handing out the one mktime normalized. When a local time is
+               // ambiguous, because the clock went back, mktime may leave
+               // tm_isdst describing the other of the two readings, and the
+               // two overloads of cron_next would then answer with different
+               // instants for the same call.
+               if (utils::time_to_tm(&calculated, &result) == nullptr)
+                  return INVALID_TIME;
+
                return calculated;
             }
          }

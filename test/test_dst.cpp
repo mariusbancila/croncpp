@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <vector>
 
 using namespace cron;
 
@@ -11,9 +12,13 @@ namespace
 {
    // croncpp evaluates expressions in local time, so these tests pin the time
    // zone rather than depending on the one the machine happens to use.
-   // CST6CDT is understood both by the Windows CRT, which applies the US rules
-   // to it, and by the zoneinfo database used everywhere else. The POSIX rule
-   // syntax, as in "CET-1CEST,M3.5.0,M10.5.0/3", is not portable to Windows.
+   // CST6CDT is read as a zone name where the zoneinfo database has the
+   // compatibility names installed, and as a POSIX specification otherwise.
+   //
+   // The dates it switches on are NOT the same everywhere: the Windows CRT
+   // applies its own idea of the US rules and does not agree with zoneinfo.
+   // Nothing below assumes a date. The transitions are discovered from the C
+   // runtime, and every expectation is expressed relative to them.
    struct scoped_tz
    {
       explicit scoped_tz(char const * tz)
@@ -39,87 +44,207 @@ namespace
       }
    };
 
-   // in CST6CDT the clock jumps forward on 2025-03-09 at 02:00 and back on 2025-11-02 at 02:00
    char const * const TZ = "CST6CDT";
 
-   std::time_t const NOV_02_0159_CDT = 1762066799; // first  01:59:59
-   std::time_t const NOV_02_0159_CST = 1762070399; // second 01:59:59
+   int const YEAR = 2025;
 
-   std::string next_from(char const * expr, char const * from)
+   std::tm local_at(std::time_t const t)
    {
-      auto cex = make_cron(expr);
-      auto date = utils::to_tm(from);
+      std::tm tm;
+      REQUIRE(utils::time_to_tm(&t, &tm) != nullptr);
 
-      return utils::to_string(cron_next(cex, date));
+      return tm;
+   }
+
+   int isdst_at(std::time_t const t)
+   {
+      std::tm tm;
+      if (utils::time_to_tm(&t, &tm) == nullptr) return -1;
+
+      return tm.tm_isdst > 0 ? 1 : 0;
+   }
+
+   struct transition
+   {
+      std::time_t at;      // the first instant on the new side of the change
+      bool        forward; // the clock jumped forward, skipping local times
+   };
+
+   // Walks a year an hour at a time looking for the DST flag changing, then
+   // narrows each change down to the second.
+   std::vector<transition> transitions_in(int const year)
+   {
+      std::vector<transition> found;
+
+      std::tm start = std::tm();
+      start.tm_year = year - 1900;
+      start.tm_mon = 0;
+      start.tm_mday = 1;
+      start.tm_hour = 12;
+      start.tm_isdst = -1;
+
+      std::time_t const first = utils::tm_to_time(start);
+      if (INVALID_TIME == first) return found;
+
+      std::time_t const last = first + 364 * 24 * 60 * 60;
+
+      int previous = isdst_at(first);
+      for (std::time_t t = first + 3600; t <= last; t += 3600)
+      {
+         int const current = isdst_at(t);
+         if (current == previous) continue;
+
+         for (std::time_t s = t - 3599; s <= t; ++s)
+         {
+            if (isdst_at(s) != previous)
+            {
+               transition const change = { s, current == 1 };
+               found.push_back(change);
+               break;
+            }
+         }
+
+         previous = current;
+      }
+
+      return found;
+   }
+
+   std::string daily_at(int const hour, int const minute)
+   {
+      return "0 " + std::to_string(minute) + " " + std::to_string(hour) + " * * *";
    }
 }
 
-TEST_CASE("dst: the fixture selects a zone with the expected transitions", "[dst]")
+TEST_CASE("dst: the zone under test observes daylight saving time", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   std::tm first;
-   std::tm second;
-   REQUIRE(utils::time_to_tm(&NOV_02_0159_CDT, &first) != nullptr);
-   REQUIRE(utils::time_to_tm(&NOV_02_0159_CST, &second) != nullptr);
+   auto const changes = transitions_in(YEAR);
 
-   // the same local time, an hour apart, either side of the transition
-   REQUIRE(utils::to_string(first) == "2025-11-02 01:59:59");
-   REQUIRE(utils::to_string(second) == "2025-11-02 01:59:59");
-   REQUIRE(first.tm_isdst > 0);
-   REQUIRE(second.tm_isdst == 0);
+   INFO("the zone " << TZ << " reported " << changes.size() << " transitions in " << YEAR);
+   REQUIRE(changes.size() >= 2);
+
+   bool forward = false;
+   bool back = false;
+   for (size_t i = 0; i < changes.size(); ++i)
+   {
+      if (changes[i].forward) forward = true;
+      else                    back = true;
+   }
+
+   REQUIRE(forward);
+   REQUIRE(back);
 }
 
-TEST_CASE("dst: the clock going forward does not send the result backwards", "[dst]")
+TEST_CASE("dst: the hour the clock skips does not fire that day", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   // asked on the day before the transition, for a time on the day of it
-   REQUIRE(next_from("0 0 12 * * *", "2025-03-08 13:00:00") == "2025-03-09 12:00:00");
-   REQUIRE(next_from("30 55 5,11,17 * * *", "2025-03-08 21:55:30") == "2025-03-09 05:55:30");
+   auto const changes = transitions_in(YEAR);
+   REQUIRE(!changes.empty());
 
-   // asked during the night of the transition, for a time just after it
-   REQUIRE(next_from("30 55 3,11,17 * * *", "2025-03-09 00:55:30") == "2025-03-09 03:55:30");
+   for (size_t i = 0; i < changes.size(); ++i)
+   {
+      if (!changes[i].forward) continue;
 
-   // the hour that does not exist: 02:30 is skipped, the next match is a day later
-   REQUIRE(next_from("0 30 2 * * *", "2025-03-09 01:00:00") == "2025-03-10 02:30:00");
+      std::tm const before = local_at(changes[i].at - 1);
+      std::tm const after = local_at(changes[i].at);
+
+      // only a whole hour skipped on the hour is covered here
+      if (after.tm_hour != before.tm_hour + 2) continue;
+
+      int const skipped = before.tm_hour + 1;
+
+      auto cex = make_cron(daily_at(skipped, 30));
+      std::time_t const from = changes[i].at - 3600;
+
+      auto const next = cron_next(cex, from);
+      REQUIRE(next > from);
+
+      std::tm const tm = local_at(next);
+      REQUIRE(tm.tm_hour == skipped);
+      REQUIRE(tm.tm_min == 30);
+      REQUIRE(tm.tm_mday != before.tm_mday); // not on the day the hour is missing
+   }
 }
 
-TEST_CASE("dst: the clock going back does not send the result backwards", "[dst]")
+TEST_CASE("dst: issue 24, a daily job keeps advancing a day at a time", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   REQUIRE(next_from("0 30 1 * * *", "2025-11-01 12:00:00") == "2025-11-02 01:30:00");
-   REQUIRE(next_from("0 0 12 * * *", "2025-11-01 13:00:00") == "2025-11-02 12:00:00");
+   auto const changes = transitions_in(YEAR);
+   REQUIRE(!changes.empty());
+
+   for (size_t i = 0; i < changes.size(); ++i)
+   {
+      // a time of day that exists on both sides of the change
+      int const hour = (local_at(changes[i].at).tm_hour + 1) % 24;
+
+      auto cex = make_cron(daily_at(hour, 30));
+
+      std::time_t t = changes[i].at - 3 * 24 * 60 * 60;
+      for (int day = 0; day < 6; ++day)
+      {
+         auto const next = cron_next(cex, t);
+
+         // the reported symptom was a result at or before the time asked about
+         REQUIRE(next > t);
+         REQUIRE(next - t <= 25 * 60 * 60); // and never a day skipped
+
+         std::tm const tm = local_at(next);
+         REQUIRE(tm.tm_hour == hour);
+         REQUIRE(tm.tm_min == 30);
+
+         t = next;
+      }
+   }
 }
 
-TEST_CASE("dst: issue 24, a daily job asked for the day before the clock goes forward", "[dst]")
+TEST_CASE("dst: an ambiguous local time resolves to a single instant", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   std::time_t const now = 1647084600; // 2022-03-12 05:30:00, transition on the 13th
-   auto cex = make_cron("0 30 4 * * *");
+   auto const changes = transitions_in(YEAR);
+   REQUIRE(!changes.empty());
 
-   auto const next = cron_next(cex, now);
+   for (size_t i = 0; i < changes.size(); ++i)
+   {
+      if (changes[i].forward) continue;
 
-   REQUIRE(next > now);
-   REQUIRE(next == 1647163800);        // 2022-03-13 04:30:00
+      // the local times in the hour before the change happen a second time in
+      // the hour after it
+      std::tm const repeated = local_at(changes[i].at - 1);
+
+      auto cex = make_cron(daily_at(repeated.tm_hour, repeated.tm_min));
+      std::time_t const from = changes[i].at - 3600;
+
+      auto const next = cron_next(cex, from);
+      REQUIRE(next > from);
+
+      std::tm const tm = local_at(next);
+      REQUIRE(tm.tm_hour == repeated.tm_hour);
+      REQUIRE(tm.tm_min == repeated.tm_min);
+   }
 }
 
 TEST_CASE("dst: cron_next is always strictly in the future", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   // Samples both transition nights against expressions that fire often
-   // enough to land inside the transition. A result at or before the time
+   auto const changes = transitions_in(YEAR);
+   REQUIRE(!changes.empty());
+
+   // Sweeps two hours either side of every transition, against expressions
+   // that fire often enough to land inside one. A result at or before the time
    // asked about would make a caller looping on cron_next spin, and that only
    // happens in a narrow window around a transition, so the window is swept
    // densely rather than spot checked.
    //
    // This is by far the largest test case in the suite: 5 expressions x 2
-   // windows x 2058 samples (4 hours at 7 second steps) x 2 assertions =
-   // 41160 assertions, of the roughly 42800 the whole suite reports. It still
-   // runs in well under a second.
+   // transitions x 2058 samples (4 hours at 7 second steps) x 2 assertions =
+   // 41160 assertions, of the roughly 43500 the whole suite reports. It still
+   // runs in a fraction of a second.
    char const * const exprs[] = {
       "0 * * * * *",
       "0 0/15 * * * *",
@@ -128,18 +253,14 @@ TEST_CASE("dst: cron_next is always strictly in the future", "[dst]")
       "0 0 12 * * *",
    };
 
-   std::time_t const spans[][2] = {
-      { 1741500000, 1741500000 + 4 * 60 * 60 }, // around the spring transition
-      { 1762063200, 1762063200 + 4 * 60 * 60 }, // around the autumn transition
-   };
-
    for (auto const & expr : exprs)
    {
       auto cex = make_cron(expr);
 
-      for (auto const & span : spans)
+      for (size_t i = 0; i < changes.size(); ++i)
       {
-         for (std::time_t t = span[0]; t < span[1]; t += 7)
+         std::time_t const stop = changes[i].at + 2 * 60 * 60;
+         for (std::time_t t = changes[i].at - 2 * 60 * 60; t < stop; t += 7)
          {
             auto const next = cron_next(cex, t);
 
@@ -150,47 +271,38 @@ TEST_CASE("dst: cron_next is always strictly in the future", "[dst]")
    }
 }
 
-TEST_CASE("dst: an ambiguous local time is resolved to a single instant", "[dst]")
-{
-   scoped_tz tz(TZ);
-
-   // 01:59:59 happens twice on this date. Asked from the first one, croncpp
-   // moves past the repeat rather than reporting the same local time again,
-   // so a daily expression fires once on the day the clock goes back.
-   auto cex = make_cron("59 59 1 * * *");
-   auto const next = cron_next(cex, NOV_02_0159_CDT);
-
-   REQUIRE(next > NOV_02_0159_CDT);
-
-   std::tm next_tm;
-   REQUIRE(utils::time_to_tm(&next, &next_tm) != nullptr);
-   REQUIRE(next_tm.tm_hour == 1);
-   REQUIRE(next_tm.tm_min == 59);
-   REQUIRE(next_tm.tm_sec == 59);
-}
-
 TEST_CASE("dst: both overloads agree across a transition", "[dst]")
 {
    scoped_tz tz(TZ);
 
-   // Sweeps the hour before the transition, the repeated hour and the hour
-   // after it: 3 expressions x 178 samples (3 hours at 61 second steps) x 2
-   // assertions = 1068 assertions.
+   auto const changes = transitions_in(YEAR);
+   REQUIRE(!changes.empty());
+
+   // Asking with a std::time_t and with the equivalent std::tm has to name the
+   // same instant, including where the local time is ambiguous and mktime has
+   // to choose between two readings of it.
+   //
+   // 3 expressions x 2 transitions x 178 samples (3 hours at 61 second steps)
+   // x 2 assertions = 2136 assertions.
    char const * const exprs[] = { "0 * * * * *", "0 0 12 * * *", "59 59 1 * * *" };
 
    for (auto const & expr : exprs)
    {
       auto cex = make_cron(expr);
 
-      for (std::time_t t = NOV_02_0159_CDT - 3600; t < NOV_02_0159_CST + 3600; t += 61)
+      for (size_t i = 0; i < changes.size(); ++i)
       {
-         std::tm date;
-         REQUIRE(utils::time_to_tm(&t, &date) != nullptr);
+         std::time_t const stop = changes[i].at + 2 * 60 * 60;
+         for (std::time_t t = changes[i].at - 60 * 60; t < stop; t += 61)
+         {
+            std::tm date;
+            REQUIRE(utils::time_to_tm(&t, &date) != nullptr);
 
-         auto const from_time = cron_next(cex, t);
-         auto from_tm = cron_next(cex, date);
+            auto const from_time = cron_next(cex, t);
+            auto from_tm = cron_next(cex, date);
 
-         REQUIRE(from_time == utils::tm_to_time(from_tm));
+            REQUIRE(from_time == utils::tm_to_time(from_tm));
+         }
       }
    }
 }
