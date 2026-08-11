@@ -153,6 +153,25 @@ assert(to_cronstr(cex) == "* * * * * *");
 assert(to_string(cex) == "111111111111111111111111111111111111111111111111111111111111 111111111111111111111111111111111111111111111111111111111111 111111111111111111111111 1111111111111111111111111111111 111111111111 1111111");
 ```
 
+## Time zones and daylight saving time
+
+croncpp evaluates expressions in **local time**. It has no time zone database of its own: `std::tm` values are converted with `std::mktime` and `localtime`, so the zone in effect is whatever the C runtime reports, which on most systems is controlled by the `TZ` environment variable. There is no UTC mode; to schedule in UTC, run the process with `TZ` set to UTC.
+
+This matters when the local clock is not continuous, which happens twice a year in zones that observe daylight saving time.
+
+**When the clock jumps forward**, some local times do not occur at all. An expression naming a time inside the gap does not fire that day; the next occurrence is on the following day.
+
+```
+// in a zone where the clock jumps from 02:00 to 03:00 on 2025-03-09
+auto cex = cron::make_cron("0 30 2 * * *");         // every day at 02:30
+auto tm  = cron::utils::to_tm("2025-03-09 01:00:00");
+
+// 02:30 does not exist on the 9th, so the next occurrence is on the 10th
+assert(cron::utils::to_string(cron::cron_next(cex, tm)) == "2025-03-10 02:30:00");
+```
+
+**When the clock goes back**, some local times occur twice, and the two are different instants an hour apart. Which of them `cron_next` returns depends on how the platform's `mktime` resolves an ambiguous local time, and that differs between implementations. croncpp does not attempt to hide the difference. What it does guarantee is that the result is a time matching the expression that is **strictly later than the one asked about**, so a caller that repeatedly feeds the previous result back in always makes progress and never repeats a value.
+
 ## Benchmarks
 
 The following results are the average (in microseconds) for running the benchmark program ten times on Windows and Mac with different compilers (all with release settings).
