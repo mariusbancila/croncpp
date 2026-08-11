@@ -376,6 +376,57 @@ TEST_CASE("standard: invalid days of week", "[std]")
    CRON_EXPECT_EXCEPT("* * * * * /2*-");
 }
 
+TEST_CASE("standard: month and day names have to stand on their own", "[std]")
+{
+   // "JAN1" used to be read as "11", which is a valid month number, so the
+   // expression was accepted and quietly meant November
+   CRON_EXPECT_EXCEPT("0 0 0 1 JAN1 *");
+   CRON_EXPECT_EXCEPT("0 0 0 1 1JAN *");
+   CRON_EXPECT_EXCEPT("0 0 0 1 JANJAN *");
+   CRON_EXPECT_EXCEPT("0 0 0 1 JANUARY *");
+   CRON_EXPECT_EXCEPT("0 0 0 1 XJANX *");
+   CRON_EXPECT_EXCEPT("* * * * * MON1");
+   CRON_EXPECT_EXCEPT("* * * * * 1MON");
+   CRON_EXPECT_EXCEPT("* * * * * SUNDAY");
+}
+
+TEST_CASE("standard: names next to a separator are still names", "[std]")
+{
+   CRON_STD_EQUAL("* * * * JAN *", "* * * * 1 *");
+   CRON_STD_EQUAL("* * * * JAN,FEB *", "* * * * 1,2 *");
+   CRON_STD_EQUAL("* * * * JAN-MAR *", "* * * * 1-3 *");
+   CRON_STD_EQUAL("* * * * JAN/2 *", "* * * * 1/2 *");
+   CRON_STD_EQUAL("* * * * FEB-DEC/3 *", "* * * * 2-12/3 *");
+   CRON_STD_EQUAL("* * * * * MON-FRI", "* * * * * 1-5");
+   CRON_STD_EQUAL("* * * * * SUN,SAT", "* * * * * 0,6");
+
+   // a name repeated in a list is replaced every time, not just the first
+   CRON_STD_EQUAL("* * * * JAN,JAN *", "* * * * 1 *");
+   CRON_STD_EQUAL("* * * * * MON,MON,FRI", "* * * * * 1,5");
+}
+
+TEST_CASE("standard: issue 7, dates that never occur", "[std]")
+{
+   CRON_EXPECT_EXCEPT("0 0 5 31 2 ?");  // February 31st
+   CRON_EXPECT_EXCEPT("0 0 0 30 2 *");  // February 30th
+   CRON_EXPECT_EXCEPT("0 0 0 31 4 *");  // April 31st
+   CRON_EXPECT_EXCEPT("0 0 0 31 6 *");  // June 31st
+   CRON_EXPECT_EXCEPT("0 0 0 31 9 *");  // September 31st
+   CRON_EXPECT_EXCEPT("0 0 0 31 11 *"); // November 31st
+   CRON_EXPECT_EXCEPT("0 0 0 30,31 2 *");
+   CRON_EXPECT_EXCEPT("0 0 0 31 2,4,6 *");
+}
+
+TEST_CASE("standard: dates that do occur are still accepted", "[std]")
+{
+   REQUIRE_NOTHROW(make_cron("0 0 0 29 2 *"));   // leap day
+   REQUIRE_NOTHROW(make_cron("0 0 0 31 1 *"));   // January has 31 days
+   REQUIRE_NOTHROW(make_cron("0 0 0 31 2,3 *")); // March does too
+   REQUIRE_NOTHROW(make_cron("0 0 0 30 2,3 *"));
+   REQUIRE_NOTHROW(make_cron("0 0 0 31 * *"));
+   REQUIRE_NOTHROW(make_cron("0 0 0 * 2 *"));
+}
+
 TEST_CASE("standard: unsupported special characters", "[std]")
 {
    CRON_EXPECT_EXCEPT("0 0 12 L * ?");

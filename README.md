@@ -44,6 +44,8 @@ The special characters have the following meaning:
 
 **Note:** the `L`, `W` and `#` special characters are described here for completeness but are **not implemented** by croncpp. An expression that uses one of them is rejected by `make_cron()` with a `bad_cronexpr` exception.
 
+**Note:** an expression describing a date that never occurs, such as `0 0 5 31 2 ?` for the 31st of February, is also rejected by `make_cron()` with a `bad_cronexpr` exception, because it has no next occurrence to compute. February is measured as a leap year, so the 29th is accepted and the 30th is not.
+
 Examples: 
 
 | CRON | Description |
