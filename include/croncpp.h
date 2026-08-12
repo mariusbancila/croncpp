@@ -54,6 +54,25 @@ namespace cron
    struct supports_years<Traits, void_t<decltype(Traits::CRON_MIN_YEARS)>>
       : std::true_type {};
 
+   // What an expression means when it restricts both the day of month and the
+   // day of week, which the two dialects croncpp follows answer differently.
+   enum class day_field_rule
+   {
+      intersect, // a date has to match both fields
+      either,    // a date matching either field is a match, as in POSIX cron
+      reject     // the expression is an error, as in Quartz
+   };
+
+   // A traits type states its rule by declaring CRON_DAY_FIELD_RULE. One that
+   // does not, as any written before the rule existed, keeps intersecting.
+   template <typename Traits, typename = void>
+   struct day_rule
+      : std::integral_constant<day_field_rule, day_field_rule::intersect> {};
+
+   template <typename Traits>
+   struct day_rule<Traits, void_t<decltype(Traits::CRON_DAY_FIELD_RULE)>>
+      : std::integral_constant<day_field_rule, Traits::CRON_DAY_FIELD_RULE> {};
+
    class cronexpr;
 
    namespace detail
@@ -83,12 +102,14 @@ namespace cron
          bool     last = false;            // L, the last day of the month
          bool     nearest_weekday = false; // W, the nearest Monday to Friday
          cron_int day = 0;                 // the day W applies to, 0 for LW
+         bool     restricted = false;      // the field was neither * nor ?
       };
 
       struct day_of_week_options
       {
-         cron_int nth = 0;      // #, the 1st to 5th such weekday of the month
-         bool     last = false; // L, the last such weekday of the month
+         cron_int nth = 0;         // #, the 1st to 5th such weekday of the month
+         bool     last = false;    // L, the last such weekday of the month
+         bool     restricted = false; // the field was neither * nor ?
       };
    }
 
@@ -122,6 +143,9 @@ namespace cron
       static const cron_int CRON_MAX_MONTHS = 12;
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
+
+      // POSIX cron: with both day fields restricted, either may match
+      static const day_field_rule CRON_DAY_FIELD_RULE = day_field_rule::either;
 
       static const int CRON_MIN_YEARS = 1970;
       static const int CRON_MAX_YEARS = 2099;
@@ -166,6 +190,9 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
+      // as in Quartz, one of the two day fields has to be ?
+      static const day_field_rule CRON_DAY_FIELD_RULE = day_field_rule::reject;
+
       static const int CRON_MIN_YEARS = 1970;
       static const int CRON_MAX_YEARS = 2099;
 
@@ -209,6 +236,9 @@ namespace cron
       static const cron_int CRON_MAX_MONTHS = 12;
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
+
+      // Quartz requires one of the two day fields to be ?
+      static const day_field_rule CRON_DAY_FIELD_RULE = day_field_rule::reject;
 
       static const int CRON_MIN_YEARS = 1970;
       static const int CRON_MAX_YEARS = 2099;
@@ -298,8 +328,10 @@ namespace cron
          e1.dom_options.last == e2.dom_options.last &&
          e1.dom_options.nearest_weekday == e2.dom_options.nearest_weekday &&
          e1.dom_options.day == e2.dom_options.day &&
+         e1.dom_options.restricted == e2.dom_options.restricted &&
          e1.dow_options.nth == e2.dow_options.nth &&
-         e1.dow_options.last == e2.dow_options.last;
+         e1.dow_options.last == e2.dow_options.last &&
+         e1.dow_options.restricted == e2.dow_options.restricted;
    }
 
    inline bool operator!=(cronexpr const & e1, cronexpr const & e2)
@@ -638,6 +670,11 @@ namespace cron
          if (days.size() == 1 && days[0] == '?')
             days[0] = '*';
 
+         // Whether the field names any particular day at all. Only * and ?
+         // leave it open; a list, a range, or even 1-31 restricts it, which is
+         // the distinction POSIX cron draws between the two day fields.
+         options.restricted = !(days.size() == 1 && days[0] == '*');
+
          // On its own, L means Saturday, as in Quartz. After a weekday it
          // means the last such weekday of the month, and # selects which one.
          if (days == "L")
@@ -701,6 +738,8 @@ namespace cron
 
          if (days.size() == 1 && days[0] == '?')
             days[0] = '*';
+
+         options.restricted = !(days.size() == 1 && days[0] == '*');
 
          if (utils::contains(days, 'L') || utils::contains(days, 'W'))
          {
@@ -1144,6 +1183,29 @@ namespace cron
          return true;
       }
 
+      // Combines the two day fields according to the rule of the dialect the
+      // traits describe. An unrestricted field matches every day, so only the
+      // case where both name particular days can differ between the rules.
+      template <typename Traits>
+      inline bool matches_day(
+         std::tm const & date,
+         std::bitset<31> const & days_of_month,
+         day_of_month_options const & dom_options,
+         std::bitset<7> const & days_of_week,
+         day_of_week_options const & dow_options)
+      {
+         bool const day_of_month =
+            matches_day_of_month<Traits>(date, days_of_month, dom_options);
+         bool const day_of_week =
+            matches_day_of_week(date, days_of_week, dow_options);
+
+         if (day_rule<Traits>::value == day_field_rule::either &&
+             dom_options.restricted && dow_options.restricted)
+            return day_of_month || day_of_week;
+
+         return day_of_month && day_of_week;
+      }
+
       template <typename Traits>
       static size_t find_next_day(
          std::tm& date,
@@ -1162,8 +1224,8 @@ namespace cron
          // CRON_MIN_DAYS_OF_WEEK and the bits are set at
          // value - CRON_MIN_DAYS_OF_WEEK.
          while (
-            !(matches_day_of_month<Traits>(date, days_of_month, dom_options) &&
-              matches_day_of_week(date, days_of_week, dow_options))
+            !matches_day<Traits>(
+               date, days_of_month, dom_options, days_of_week, dow_options)
             && count++ < maximum)
          {
             add_to_field(date, cron_field::day_of_month, 1);
@@ -1396,6 +1458,13 @@ namespace cron
       detail::set_cron_days_of_week<Traits>(fields[5], cex.days_of_week, cex.dow_options);
 
       detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month, cex.dom_options);
+
+      // Quartz, and the Oracle format that follows it, require one of the two
+      // day fields to be left open with ?
+      if (day_rule<Traits>::value == day_field_rule::reject &&
+          cex.dom_options.restricted && cex.dow_options.restricted)
+         throw bad_cronexpr(
+            "Specify a day of month or a day of week, and ? for the other");
 
       detail::set_cron_month<Traits>(fields[4], cex.months);
 

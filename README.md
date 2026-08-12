@@ -55,6 +55,21 @@ The special characters have the following meaning:
 
 `W` moves to the nearest Monday to Friday: back one day from a Saturday, forward one day from a Sunday. It never crosses into another month, so `1W` on a Saturday is the Monday after, and `31W` on a Sunday is the Friday before. The weekday numbers in `5L` and `5#2` follow the traits in use, so the last Friday is `5L` with `cron_standard_traits` and `6L` with `cron_quartz_traits`.
 
+### The two day fields
+
+The days of month and days of week fields both select days, so an expression restricting both has to say what that means. The two dialects croncpp follows disagree, and each traits type states its own answer through `CRON_DAY_FIELD_RULE`:
+
+| Traits | Rule | Meaning |
+| --- | --- | --- |
+| `cron_standard_traits` | `day_field_rule::either` | a date matching **either** field is a match, as in POSIX cron |
+| `cron_quartz_traits`, `cron_oracle_traits` | `day_field_rule::reject` | the expression is an error; one of the two fields has to be `?` |
+
+So `0 0 0 1 1 1` — midnight on the 1st of January, and on Mondays in January — resolves to the 1st of January 2021 under the standard traits, because that date matches the days of month half. Under the quartz and oracle traits the same expression is rejected, and `0 0 0 1 1 ?` or `0 0 0 ? 1 1` says which of the two was meant.
+
+A field counts as restricted unless it is exactly `*` or `?`. `1-31` covers every day but is still a restriction, and POSIX treats it as one.
+
+A traits type that does not declare `CRON_DAY_FIELD_RULE` gets `day_field_rule::intersect`, where a date has to match both fields. That was croncpp's behaviour before the rule existed, so custom traits written against an earlier version are unaffected.
+
 The `years` field is optional, as in Quartz, and may be left out entirely. An expression whose years have all gone by has no next occurrence, so `cron_next()` reports failure for it: `INVALID_TIME` from the `std::time_t` overload, and a zeroed `std::tm` from the other.
 
 A traits type opts into the year field by declaring `CRON_MIN_YEARS` and `CRON_MAX_YEARS`, as all three supplied ones do. A traits type written without them keeps accepting six fields and rejects a seventh, so custom traits written against an earlier version of croncpp continue to work unchanged. Note that the range croncpp can store is fixed at 1970-2099 whatever the traits say, so a traits type may narrow that range but not widen it.
