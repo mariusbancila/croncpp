@@ -142,6 +142,26 @@ TEST_CASE("years: combined with the other fields", "[years]")
    REQUIRE(next("0 15 10 L * ? 2005", "2004-06-01 00:00:00") == "2005-01-31 10:15:00");
 }
 
+TEST_CASE("years: issue 6, the quartz form with a year", "[years]")
+{
+   // 09:00 on the 12th of March 2019, written with leading zeros
+   REQUIRE(next_str<cron_quartz_traits>("00 00 09 12 03 ? 2019", "2018-01-01 00:00:00")
+           == "2019-03-12 09:00:00");
+   REQUIRE(next_str<cron_standard_traits>("00 00 09 12 03 ? 2019", "2018-01-01 00:00:00")
+           == "2019-03-12 09:00:00");
+
+   // oracle numbers the months from zero
+   REQUIRE(next_str<cron_oracle_traits>("00 00 09 12 02 ? 2019", "2018-01-01 00:00:00")
+           == "2019-03-12 09:00:00");
+
+   // that day has gone by
+   REQUIRE(next_str<cron_quartz_traits>("00 00 09 12 03 ? 2019", "2020-01-01 00:00:00") == "none");
+
+   // six fields put the year in the day of week field, which quartz does not
+   // allow either: the year is a seventh field, after the day of week
+   CRON_EXPECT_EXCEPT("00 00 09 12 03 2019");
+}
+
 TEST_CASE("years: outside the supported range", "[years]")
 {
    CRON_EXPECT_EXCEPT("0 15 10 * * ? 1969");
