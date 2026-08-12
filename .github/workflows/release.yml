@@ -1,0 +1,27 @@
+name: Release
+
+# croncpp is a single header, and the source archives GitHub attaches to a
+# release on its own bury it inside a directory. Attach the header itself so
+# that it can be downloaded directly, as earlier releases did by hand.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  attach-header:
+    name: Attach croncpp.h
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Attach the header to the release
+        run: gh release upload "${{ github.event.release.tag_name }}" include/croncpp.h --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
