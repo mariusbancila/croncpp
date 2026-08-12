@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <type_traits>
 
 #if __cplusplus > 201402L
 #include <string_view>
@@ -33,6 +34,25 @@ namespace cron
    constexpr std::time_t INVALID_TIME = static_cast<std::time_t>(-1);
 
    constexpr size_t INVALID_INDEX = static_cast<size_t>(-1);
+
+   // The years a cronexpr can hold. cronexpr is not a template, so this range
+   // is fixed for every traits type; a traits type may accept a narrower range
+   // but not a wider one.
+   constexpr int    CRON_YEAR_BASE  = 1970;
+   constexpr size_t CRON_YEAR_COUNT = 130; // through 2099, as in Quartz
+
+   // A traits type opts into the optional year field by declaring
+   // CRON_MIN_YEARS and CRON_MAX_YEARS. One that does not, as any written
+   // before the field existed, keeps taking six fields and rejects a seventh.
+   template <typename...> struct make_void { using type = void; };
+   template <typename... Ts> using void_t = typename make_void<Ts...>::type;
+
+   template <typename Traits, typename = void>
+   struct supports_years : std::false_type {};
+
+   template <typename Traits>
+   struct supports_years<Traits, void_t<decltype(Traits::CRON_MIN_YEARS)>>
+      : std::true_type {};
 
    class cronexpr;
 
@@ -103,6 +123,9 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
+      static const int CRON_MIN_YEARS = 1970;
+      static const int CRON_MAX_YEARS = 2099;
+
 #ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
       static const inline std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
@@ -142,6 +165,9 @@ namespace cron
       static const cron_int CRON_MAX_MONTHS = 11;
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
+
+      static const int CRON_MIN_YEARS = 1970;
+      static const int CRON_MAX_YEARS = 2099;
 
 #ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
@@ -184,6 +210,9 @@ namespace cron
 
       static const cron_int CRON_MAX_YEARS_DIFF = 4;
 
+      static const int CRON_MIN_YEARS = 1970;
+      static const int CRON_MAX_YEARS = 2099;
+
 #ifdef CRONCPP_IS_CPP17
       static const inline std::vector<std::string> DAYS = { "NIL", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
       static const inline std::vector<std::string> MONTHS = { "NIL", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
@@ -215,6 +244,7 @@ namespace cron
       std::bitset<7>  days_of_week;
       std::bitset<31> days_of_month;
       std::bitset<12> months;
+      std::bitset<CRON_YEAR_COUNT> years;
       std::string     expr;
 
       detail::day_of_month_options dom_options;
@@ -250,7 +280,8 @@ namespace cron
             hours.none() ||
             days_of_week.none() ||
             no_day_of_month ||
-            months.none();
+            months.none() ||
+            years.none();
       }
    };
 
@@ -263,6 +294,7 @@ namespace cron
          e1.days_of_week == e2.days_of_week &&
          e1.days_of_month == e2.days_of_month &&
          e1.months == e2.months &&
+         e1.years == e2.years &&
          e1.dom_options.last == e2.dom_options.last &&
          e1.dom_options.nearest_weekday == e2.dom_options.nearest_weekday &&
          e1.dom_options.day == e2.dom_options.day &&
@@ -398,7 +430,8 @@ namespace cron
          return days[month];
       }
 
-      inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
+      template <typename T>
+      inline T to_cron_number(CRONCPP_STRING_VIEW text)
       {
          if (text.empty())
             throw bad_cronexpr("Cron field value cannot be empty");
@@ -419,10 +452,10 @@ namespace cron
          try
          {
             auto const value = std::stoul(std::string(text));
-            if (value > static_cast<unsigned long>((std::numeric_limits<cron_int>::max)()))
+            if (value > static_cast<unsigned long>((std::numeric_limits<T>::max)()))
                throw bad_cronexpr("Cron field value is out of range");
 
-            return static_cast<cron_int>(value);
+            return static_cast<T>(value);
          }
          catch (std::invalid_argument const & ex)
          {
@@ -437,6 +470,11 @@ namespace cron
       inline bool is_field_separator(char const ch)
       {
          return ch == ',' || ch == '-' || ch == '/';
+      }
+
+      inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
+      {
+         return to_cron_number<cron_int>(text);
       }
 
       static std::string replace_ordinals(
@@ -476,13 +514,14 @@ namespace cron
          return text;
       }
 
-      static std::pair<cron_int, cron_int> make_range(
+      template <typename T>
+      static std::pair<T, T> make_range(
          CRONCPP_STRING_VIEW field,
-         cron_int const minval,
-         cron_int const maxval)
+         T const minval,
+         T const maxval)
       {
-         cron_int first = 0;
-         cron_int last = 0;
+         T first = 0;
+         T last = 0;
          if (field.size() == 1 && field[0] == '*')
          {
             first = minval;
@@ -490,7 +529,7 @@ namespace cron
          }
          else if (!utils::contains(field, '-'))
          {
-            first = to_cron_int(field);
+            first = to_cron_number<T>(field);
             last = first;
          }
          else
@@ -499,8 +538,8 @@ namespace cron
             if (parts.size() != 2)
                throw bad_cronexpr("Specified range requires two fields");
 
-            first = to_cron_int(parts[0]);
-            last = to_cron_int(parts[1]);
+            first = to_cron_number<T>(parts[0]);
+            last = to_cron_number<T>(parts[1]);
          }
 
          if (first > maxval || last > maxval)
@@ -519,12 +558,12 @@ namespace cron
          return { first, last };
       }
 
-      template <size_t N>
+      template <typename T, size_t N>
       static void set_cron_field(
          CRONCPP_STRING_VIEW value,
          std::bitset<N>& target,
-         cron_int const minval,
-         cron_int const maxval)
+         T const minval,
+         T const maxval)
       {
          if(value.length() > 0 && value[value.length()-1] == ',')
             throw bad_cronexpr("Value cannot end with comma");
@@ -538,13 +577,13 @@ namespace cron
             if (!utils::contains(field, '/'))
             {
 #ifdef CRONCPP_IS_CPP17
-               auto[first, last] = detail::make_range(field, minval, maxval);
+               auto[first, last] = detail::make_range<T>(field, minval, maxval);
 #else
-               auto range = detail::make_range(field, minval, maxval);
+               auto range = detail::make_range<T>(field, minval, maxval);
                auto first = range.first;
                auto last = range.second;
 #endif
-               for (cron_int i = first - minval; i <= last - minval; ++i)
+               for (T i = first - minval; i <= last - minval; ++i)
                {
                   target.set(i);
                }
@@ -556,9 +595,9 @@ namespace cron
                   throw bad_cronexpr("Incrementer must have two fields");
 
 #ifdef CRONCPP_IS_CPP17
-               auto[first, last] = detail::make_range(parts[0], minval, maxval);
+               auto[first, last] = detail::make_range<T>(parts[0], minval, maxval);
 #else
-               auto range = detail::make_range(parts[0], minval, maxval);
+               auto range = detail::make_range<T>(parts[0], minval, maxval);
                auto first = range.first;
                auto last = range.second;
 #endif
@@ -568,11 +607,11 @@ namespace cron
                   last = maxval;
                }
 
-               auto delta = detail::to_cron_int(parts[1]);
+               auto delta = detail::to_cron_number<T>(parts[1]);
                if(delta <= 0)
                   throw bad_cronexpr("Incrementer must be a positive value");
 
-               for (cron_int i = first - minval; i <= last - minval; i += delta)
+               for (T i = first - minval; i <= last - minval; i += delta)
                {
                   target.set(i);
                }
@@ -725,6 +764,76 @@ namespace cron
             Traits::CRON_MIN_MONTHS,
             Traits::CRON_MAX_MONTHS);
       }
+
+      // The optional year field. The primary template is used when the traits
+      // type declares a year range; the specialisation keeps traits written
+      // before the field existed compiling, with a seventh field rejected.
+      template <typename Traits, bool = supports_years<Traits>::value>
+      struct year_field
+      {
+         static void set(
+            std::string const & value,
+            std::bitset<CRON_YEAR_COUNT> & target)
+         {
+            static_assert(Traits::CRON_MIN_YEARS >= CRON_YEAR_BASE,
+               "the traits accept years earlier than croncpp can store");
+            static_assert(Traits::CRON_MAX_YEARS <
+                          CRON_YEAR_BASE + static_cast<int>(CRON_YEAR_COUNT),
+               "the traits accept years later than croncpp can store");
+
+            // An unrestricted field means every year the traits allow, which
+            // may be narrower than the range croncpp stores.
+            if (value == "*")
+            {
+               set_all(target);
+               return;
+            }
+
+            // indexed from CRON_YEAR_BASE, so that the stored range does not
+            // depend on the traits
+            set_cron_field<int>(
+               value,
+               target,
+               CRON_YEAR_BASE,
+               static_cast<int>(CRON_YEAR_BASE + CRON_YEAR_COUNT) - 1);
+
+            // a traits type may accept a narrower range than croncpp stores
+            for (size_t i = 0; i < target.size(); ++i)
+            {
+               if (!target.test(i)) continue;
+
+               int const year = static_cast<int>(i) + CRON_YEAR_BASE;
+               if (year < Traits::CRON_MIN_YEARS || year > Traits::CRON_MAX_YEARS)
+                  throw bad_cronexpr("Specified year is out of range");
+            }
+         }
+
+         // used when the expression leaves the field out altogether
+         static void set_all(std::bitset<CRON_YEAR_COUNT> & target)
+         {
+            for (int year = Traits::CRON_MIN_YEARS;
+                 year <= Traits::CRON_MAX_YEARS;
+                 ++year)
+               target.set(static_cast<size_t>(year - CRON_YEAR_BASE));
+         }
+      };
+
+      template <typename Traits>
+      struct year_field<Traits, false>
+      {
+         static void set(
+            std::string const &,
+            std::bitset<CRON_YEAR_COUNT> &)
+         {
+            throw bad_cronexpr("These traits do not support a year field");
+         }
+
+         // these traits have no notion of a year, so no year is excluded
+         static void set_all(std::bitset<CRON_YEAR_COUNT> & target)
+         {
+            target.set();
+         }
+      };
 
       template <size_t N>
       inline size_t next_set_bit(
@@ -1164,11 +1273,45 @@ namespace cron
             marked_fields);
          if (month != updated_month)
          {
-            if (date.tm_year - dot > Traits::CRON_MAX_YEARS_DIFF)
+            // An expression that names its years bounds the search by itself,
+            // and may legitimately reach further ahead than this cap allows.
+            if (cex.years.all() && date.tm_year - dot > Traits::CRON_MAX_YEARS_DIFF)
                return false;
 
             res = find_next<Traits>(cex, date, dot);
             if (!res) return res;
+         }
+
+         if (!cex.years.all())
+         {
+            int const year = date.tm_year + 1900;
+            size_t const index = year > CRON_YEAR_BASE
+               ? static_cast<size_t>(year - CRON_YEAR_BASE)
+               : 0;
+
+            if (index >= CRON_YEAR_COUNT) return false;
+
+            if (!cex.years.test(index))
+            {
+               auto const next_year =
+                  next_set_bit(cex.years, 0, CRON_YEAR_COUNT, index);
+               if (INVALID_INDEX == next_year) return false;
+
+               // Jump straight to the start of that year rather than walking
+               // the months towards it, which for a distant year would recurse
+               // once per month along the way.
+               std::tm start = std::tm();
+               start.tm_year = static_cast<int>(next_year) + CRON_YEAR_BASE - 1900;
+               start.tm_mon = 0;
+               start.tm_mday = 1;
+               start.tm_isdst = -1;
+
+               if (INVALID_TIME == utils::tm_to_time(start)) return false;
+
+               date = start;
+
+               return find_next<Traits>(cex, date, date.tm_year);
+            }
          }
 
          return res;
@@ -1237,8 +1380,14 @@ namespace cron
          std::remove_if(std::begin(fields), std::end(fields),
             [](CRONCPP_STRING_VIEW s) {return s.empty(); }),
          std::end(fields));
-      if (fields.size() != 6)
-         throw bad_cronexpr("cron expression must have six fields");
+      // the year is optional, and only for traits that declare a range for it
+      bool const years_allowed = supports_years<Traits>::value;
+
+      if (fields.size() != 6 && !(years_allowed && fields.size() == 7))
+         throw bad_cronexpr(
+            years_allowed
+               ? "cron expression must have six or seven fields"
+               : "cron expression must have six fields");
 
       detail::set_cron_field(fields[0], cex.seconds, Traits::CRON_MIN_SECONDS, Traits::CRON_MAX_SECONDS);
       detail::set_cron_field(fields[1], cex.minutes, Traits::CRON_MIN_MINUTES, Traits::CRON_MAX_MINUTES);
@@ -1249,6 +1398,11 @@ namespace cron
       detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month, cex.dom_options);
 
       detail::set_cron_month<Traits>(fields[4], cex.months);
+
+      if (fields.size() == 7)
+         detail::year_field<Traits>::set(fields[6], cex.years);
+      else
+         detail::year_field<Traits>::set_all(cex.years); // no year field named
 
       // A date such as the 31st of February never arrives, so there is no
       // next occurrence to compute and the expression is rejected here rather

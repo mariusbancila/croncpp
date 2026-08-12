@@ -5,7 +5,7 @@
 [![CI](https://github.com/mariusbancila/croncpp/actions/workflows/ci.yml/badge.svg)](https://github.com/mariusbancila/croncpp/actions/workflows/ci.yml)
 
 ## CRON expressions
-A CRON expression is a string composed of six fields (in some implementation seven) separated by a whites space representing a time schedule. The general form is the following (with the `years` being optional):
+A CRON expression is a string composed of six or seven fields separated by a white space representing a time schedule. The general form is the following (with the `years` being optional):
 
 ```
 <seconds> <minutes> <hours> <days of month> <months> <days of week> <years>
@@ -21,7 +21,7 @@ The following values are allowed for these fields:
 | days of month | 1-31 | 1-31 | 1-31 | 1-31 | `*` `,` `-` `?` `L` `W` |
 | months | yes | 1-12 | 0-11 | 1-12 | `*` `,` `-` |
 | days of week | yes | 0-6 | 1-7 | 1-7 | `*` `,` `-` `?` `L` `#` |
-| years | no | 1970-2099 | 1970-2099 | 1970-2099 | `*` `,` `-` |
+| years | no | 1970-2099 | 1970-2099 | 1970-2099 | `*` `,` `-` `/` |
 
 \* - As described on Wikipedia [Cron](https://en.wikipedia.org/wiki/Cron)
 
@@ -55,6 +55,10 @@ The special characters have the following meaning:
 
 `W` moves to the nearest Monday to Friday: back one day from a Saturday, forward one day from a Sunday. It never crosses into another month, so `1W` on a Saturday is the Monday after, and `31W` on a Sunday is the Friday before. The weekday numbers in `5L` and `5#2` follow the traits in use, so the last Friday is `5L` with `cron_standard_traits` and `6L` with `cron_quartz_traits`.
 
+The `years` field is optional, as in Quartz, and may be left out entirely. An expression whose years have all gone by has no next occurrence, so `cron_next()` reports failure for it: `INVALID_TIME` from the `std::time_t` overload, and a zeroed `std::tm` from the other.
+
+A traits type opts into the year field by declaring `CRON_MIN_YEARS` and `CRON_MAX_YEARS`, as all three supplied ones do. A traits type written without them keeps accepting six fields and rejects a seventh, so custom traits written against an earlier version of croncpp continue to work unchanged. Note that the range croncpp can store is fixed at 1970-2099 whatever the traits say, so a traits type may narrow that range but not widen it.
+
 **Note:** an expression describing a date that never occurs, such as `0 0 5 31 2 ?` for the 31st of February, is also rejected by `make_cron()` with a `bad_cronexpr` exception, because it has no next occurrence to compute. February is measured as a leap year, so the 29th is accepted and the 30th is not.
 
 Examples: 
@@ -74,6 +78,8 @@ Examples:
 | 0 15 10 15W * ? | 10:15 AM on the weekday nearest the 15th of every month |
 | 0 15 10 ? * 5L | 10:15 AM on the last Friday of every month |
 | 0 15 10 ? * 5#2 | 10:15 AM on the second Friday of every month |
+| 0 15 10 * * ? 2005 | 10:15 AM every day during the year 2005 |
+| 0 15 10 ? * 5L 2002-2006 | 10:15 AM on the last Friday of every month during 2002 to 2006 |
 | 0 0 12 1/5 * ? | 12 PM every 5 days every month, starting on the first day of the month |
 | 0 11 11 11 11 ? | Every November 11th at 11:11 AM |
 
