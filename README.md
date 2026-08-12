@@ -169,6 +169,23 @@ catch (cron::bad_cronexpr const & ex)
 
 croncpp deliberately stays within C++11, so it does not use the calendar and time zone facilities added to `<chrono>` in C++20. Time is handled through `std::mktime` and `localtime`, in local time, as described under [Time zones and daylight saving time](#time-zones-and-daylight-saving-time).
 
+### Looking backwards
+
+`cron_prev()` is the counterpart of `cron_next()`: it returns the last time matching the expression that is strictly earlier than the one given. It takes the same three argument types and reports failure the same way.
+
+```
+auto cron = cron::make_cron("0 15 10 * * ?");
+
+std::time_t now = std::time(0);
+std::time_t previous = cron::cron_prev(cron, now);
+```
+
+It is answered by calling `cron_next()` repeatedly rather than by searching backwards, which keeps one implementation of the calendar rules instead of two. A single call costs at most **34 calls to `cron_next()`** — six to bracket the answer, twenty seven to halve the interval and one to read it off — and about **8** for an expression that fires every second. That cost follows the width of the interval searched, not how often the expression fires, so an expression firing every second of one day costs no more than one firing once a year.
+
+For a single lookup that is not worth thinking about. For walking a long stretch of history, call `cron_next()` forward from a starting point instead of calling `cron_prev()` in a loop.
+
+`cron_prev()` reaches back at most four years, the same horizon `cron_next()` searches forward. An occurrence older than that is reported as no occurrence at all.
+
 ### When there is no next occurrence
 
 An expression can name a schedule that never comes round again, most obviously one whose years have all gone by. Each overload reports that in the way that suits its return type:
