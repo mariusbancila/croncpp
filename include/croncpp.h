@@ -1510,22 +1510,60 @@ namespace cron
       return detail::find_next_after<Traits>(cex, date, result);
    }
 
-  template <typename Traits = cron_standard_traits>
-  static std::chrono::system_clock::time_point cron_next(cronexpr const & cex, std::chrono::system_clock::time_point const & time_point) {
-     return std::chrono::system_clock::from_time_t(cron_next<Traits>(cex, std::chrono::system_clock::to_time_t(time_point)));
-  }
+   // The time_point overloads keep the duration they were given, so a caller
+   // working in milliseconds gets milliseconds back rather than the default
+   // duration of the clock.
+   //
+   // When there is no next occurrence they return time_point::min(), which is
+   // the counterpart of the INVALID_TIME the std::time_t overload returns.
+   // Turning that sentinel into a time_point through from_time_t would name a
+   // real instant just before the epoch, which reads as an ordinary answer.
+   template <typename Traits = cron_standard_traits, typename Duration>
+   static std::chrono::time_point<std::chrono::system_clock, Duration> cron_next(
+      cronexpr const & cex,
+      std::chrono::time_point<std::chrono::system_clock, Duration> const & time_point)
+   {
+      using result_type =
+         std::chrono::time_point<std::chrono::system_clock, Duration>;
 
-  template <typename Traits = cron_standard_traits>
-  static std::chrono::system_clock::time_point cron_next_ceil(cronexpr const & cex, std::chrono::system_clock::time_point const & time_point) {
-     // std::chrono::system_clock::to_time_t truncates fractional seconds.
-     // If the input time_point represents a known cron trigger time but is
-     // slightly below that exact second, truncation can move it back one
-     // second and cause cron_next to return the current trigger instead of
-     // the next one.
-     auto tt = std::chrono::system_clock::to_time_t(time_point);
-     if (std::chrono::system_clock::from_time_t(tt) < time_point) {
-        ++tt;
-     }
-     return std::chrono::system_clock::from_time_t(cron_next<Traits>(cex, tt));
-  }
+      auto const from = std::chrono::time_point_cast<
+         std::chrono::system_clock::duration>(time_point);
+
+      auto const next = cron_next<Traits>(
+         cex, std::chrono::system_clock::to_time_t(from));
+
+      if (INVALID_TIME == next) return (result_type::min)();
+
+      return std::chrono::time_point_cast<Duration>(
+         std::chrono::system_clock::from_time_t(next));
+   }
+
+   template <typename Traits = cron_standard_traits, typename Duration>
+   static std::chrono::time_point<std::chrono::system_clock, Duration> cron_next_ceil(
+      cronexpr const & cex,
+      std::chrono::time_point<std::chrono::system_clock, Duration> const & time_point)
+   {
+      using result_type =
+         std::chrono::time_point<std::chrono::system_clock, Duration>;
+
+      auto const from = std::chrono::time_point_cast<
+         std::chrono::system_clock::duration>(time_point);
+
+      // std::chrono::system_clock::to_time_t truncates fractional seconds.
+      // If the input time_point represents a known cron trigger time but is
+      // slightly below that exact second, truncation can move it back one
+      // second and cause cron_next to return the current trigger instead of
+      // the next one.
+      auto tt = std::chrono::system_clock::to_time_t(from);
+      if (std::chrono::system_clock::from_time_t(tt) < from) {
+         ++tt;
+      }
+
+      auto const next = cron_next<Traits>(cex, tt);
+
+      if (INVALID_TIME == next) return (result_type::min)();
+
+      return std::chrono::time_point_cast<Duration>(
+         std::chrono::system_clock::from_time_t(next));
+   }
 }

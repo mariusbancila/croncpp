@@ -150,6 +150,8 @@ catch (cron::bad_cronexpr const & ex)
 A `std::chrono::system_clock::time_point` overload is also available, but because `cron_next()` converts the time point to `time_t` using `to_time_t()`, fractional seconds are truncated.
 If you are working from a known trigger instant and a sub-second drift could move the time point below the exact second, use `cron_next_ceil()` to round up to the next whole second before computing the next occurrence.
 
+Both take a `std::chrono::time_point` of any duration on the system clock and return the same type, so a caller working in milliseconds gets milliseconds back.
+
 ```
 try
 {
@@ -162,6 +164,28 @@ try
 catch (cron::bad_cronexpr const & ex)
 {
    std::cerr << ex.what() << '\n';
+}
+```
+
+croncpp deliberately stays within C++11, so it does not use the calendar and time zone facilities added to `<chrono>` in C++20. Time is handled through `std::mktime` and `localtime`, in local time, as described under [Time zones and daylight saving time](#time-zones-and-daylight-saving-time).
+
+### When there is no next occurrence
+
+An expression can name a schedule that never comes round again, most obviously one whose years have all gone by. Each overload reports that in the way that suits its return type:
+
+| Overload | Reports failure as |
+| --- | --- |
+| `std::time_t` | `INVALID_TIME`, that is `static_cast<std::time_t>(-1)` |
+| `std::tm` | a zeroed `std::tm` |
+| `std::chrono::time_point` | `time_point::min()` |
+
+```
+auto cron = cron::make_cron("0 15 10 * * ? 2005");   // a year long past
+
+auto next = cron::cron_next(cron, std::chrono::system_clock::now());
+if (next == std::chrono::system_clock::time_point::min())
+{
+   // nothing further is scheduled
 }
 ```
 

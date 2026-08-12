@@ -1,4 +1,4 @@
-set(SOURCES main.cpp test_day_fields.cpp test_dst.cpp test_oracle.cpp test_quartz.cpp test_special.cpp test_standard.cpp test_years.cpp)
+set(SOURCES main.cpp test_chrono.cpp test_day_fields.cpp test_dst.cpp test_oracle.cpp test_quartz.cpp test_special.cpp test_standard.cpp test_years.cpp)
 
 add_executable(test_croncpp ${SOURCES})
 
