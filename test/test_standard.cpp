@@ -427,14 +427,18 @@ TEST_CASE("standard: dates that do occur are still accepted", "[std]")
    REQUIRE_NOTHROW(make_cron("0 0 0 * 2 *"));
 }
 
-TEST_CASE("standard: unsupported special characters", "[std]")
+// L, W and # are only meaningful in the day fields; see test_special.cpp for
+// what they do there
+TEST_CASE("standard: special characters outside the day fields", "[std]")
 {
-   CRON_EXPECT_EXCEPT("0 0 12 L * ?");
-   CRON_EXPECT_EXCEPT("0 15 10 L * ?");
-   CRON_EXPECT_EXCEPT("0 0 12 15W * ?");
-   CRON_EXPECT_EXCEPT("0 0 12 LW * ?");
-   CRON_EXPECT_EXCEPT("0 0 12 ? * 5L");
-   CRON_EXPECT_EXCEPT("0 0 12 ? * 6#3");
+   CRON_EXPECT_EXCEPT("L 0 12 * * ?");
+   CRON_EXPECT_EXCEPT("0 L 12 * * ?");
+   CRON_EXPECT_EXCEPT("0 0 L * * ?");
+   CRON_EXPECT_EXCEPT("0 0 12 * L ?");
+   CRON_EXPECT_EXCEPT("0 0 12W * * ?");
+   CRON_EXPECT_EXCEPT("0 0 12 * 5W ?");
+   CRON_EXPECT_EXCEPT("0 0 12 * 5#2 ?");
+   CRON_EXPECT_EXCEPT("0 0#2 12 * * ?");
 }
 
 TEST_CASE("standard: trailing garbage is not ignored", "[std]")

@@ -42,7 +42,18 @@ The special characters have the following meaning:
 | `W` | weekday | the weekday nearest to the given day |
 | `#` | nth |  specify the Nth day of the month |
 
-**Note:** the `L`, `W` and `#` special characters are described here for completeness but are **not implemented** by croncpp. An expression that uses one of them is rejected by `make_cron()` with a `bad_cronexpr` exception.
+`L`, `W` and `#` are only meaningful in the day fields, and each applies to a single value, so they cannot be combined with a list, a range or an increment. Used anywhere else, or combined, they are rejected by `make_cron()` with a `bad_cronexpr` exception.
+
+| Expression | Field | Meaning |
+| --- | --- | --- |
+| `L` | days of month | the last day of the month |
+| `LW` | days of month | the last weekday of the month |
+| `15W` | days of month | the weekday nearest the 15th, without leaving the month |
+| `L` | days of week | Saturday, as in Quartz |
+| `5L` | days of week | the last Friday of the month |
+| `5#2` | days of week | the second Friday of the month |
+
+`W` moves to the nearest Monday to Friday: back one day from a Saturday, forward one day from a Sunday. It never crosses into another month, so `1W` on a Saturday is the Monday after, and `31W` on a Sunday is the Friday before. The weekday numbers in `5L` and `5#2` follow the traits in use, so the last Friday is `5L` with `cron_standard_traits` and `6L` with `cron_quartz_traits`.
 
 **Note:** an expression describing a date that never occurs, such as `0 0 5 31 2 ?` for the 31st of February, is also rejected by `make_cron()` with a `bad_cronexpr` exception, because it has no next occurrence to compute. February is measured as a leap year, so the 29th is accepted and the 30th is not.
 
@@ -58,6 +69,11 @@ Examples:
 | 0 0/5 14 * * ? | Every 5 minutes starting at 2 PM and ending at 2:55 PM, every day |
 | 0 10,44 14 ? 3 WED | 2:10 PM and at 2:44 PM every Wednesday of March |
 | 0 15 10 ? * MON-FRI | 10:15 AM every Monday, Tuesday, Wednesday, Thursday and Friday |
+| 0 15 10 L * ? | 10:15 AM on the last day of every month |
+| 0 15 10 LW * ? | 10:15 AM on the last weekday of every month |
+| 0 15 10 15W * ? | 10:15 AM on the weekday nearest the 15th of every month |
+| 0 15 10 ? * 5L | 10:15 AM on the last Friday of every month |
+| 0 15 10 ? * 5#2 | 10:15 AM on the second Friday of every month |
 | 0 0 12 1/5 * ? | 12 PM every 5 days every month, starting on the first day of the month |
 | 0 11 11 11 11 ? | Every November 11th at 11:11 AM |
 
