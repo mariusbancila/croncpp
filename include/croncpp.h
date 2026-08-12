@@ -53,6 +53,23 @@ namespace cron
       static bool find_next(cronexpr const & cex,
                             std::tm& date,
                             size_t const dot);
+
+      // The day fields accept qualifiers that a bitset cannot express, because
+      // the day they select depends on the month: "the last one", "the third
+      // Friday", "the weekday nearest the 15th". They are held alongside the
+      // bitsets and applied when a candidate date is tested.
+      struct day_of_month_options
+      {
+         bool     last = false;            // L, the last day of the month
+         bool     nearest_weekday = false; // W, the nearest Monday to Friday
+         cron_int day = 0;                 // the day W applies to, 0 for LW
+      };
+
+      struct day_of_week_options
+      {
+         cron_int nth = 0;      // #, the 1st to 5th such weekday of the month
+         bool     last = false; // L, the last such weekday of the month
+      };
    }
 
    struct bad_cronexpr : public std::runtime_error
@@ -200,6 +217,9 @@ namespace cron
       std::bitset<12> months;
       std::string     expr;
 
+      detail::day_of_month_options dom_options;
+      detail::day_of_week_options  dow_options;
+
       friend bool operator==(cronexpr const & e1, cronexpr const & e2);
       friend bool operator!=(cronexpr const & e1, cronexpr const & e2);
 
@@ -217,12 +237,19 @@ namespace cron
    public:
       bool empty() const noexcept
       {
+         // a day of month selected by L or W leaves the bitset empty, because
+         // which day it is depends on the month
+         bool const no_day_of_month =
+            days_of_month.none() &&
+            !dom_options.last &&
+            !dom_options.nearest_weekday;
+
          return
             seconds.none() ||
             minutes.none() ||
             hours.none() ||
             days_of_week.none() ||
-            days_of_month.none() ||
+            no_day_of_month ||
             months.none();
       }
    };
@@ -235,7 +262,12 @@ namespace cron
          e1.hours == e2.hours &&
          e1.days_of_week == e2.days_of_week &&
          e1.days_of_month == e2.days_of_month &&
-         e1.months == e2.months;
+         e1.months == e2.months &&
+         e1.dom_options.last == e2.dom_options.last &&
+         e1.dom_options.nearest_weekday == e2.dom_options.nearest_weekday &&
+         e1.dom_options.day == e2.dom_options.day &&
+         e1.dow_options.nth == e2.dow_options.nth &&
+         e1.dow_options.last == e2.dow_options.last;
    }
 
    inline bool operator!=(cronexpr const & e1, cronexpr const & e2)
@@ -350,6 +382,22 @@ namespace cron
    namespace detail
    {
 
+      inline bool is_leap_year(int const year)
+      {
+         return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+      }
+
+      // month is 0 based, as in std::tm::tm_mon
+      inline int days_in_month(int const year, int const month)
+      {
+         static int const days[12] =
+            { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+         if (month == 1 && is_leap_year(year)) return 29;
+
+         return days[month];
+      }
+
       inline cron_int to_cron_int(CRONCPP_STRING_VIEW text)
       {
          if (text.empty())
@@ -361,7 +409,7 @@ namespace cron
             {
                if (ch == 'L' || ch == 'W' || ch == '#')
                   throw bad_cronexpr(
-                     std::string("Special character '") + ch + "' is not supported");
+                     std::string("Special character '") + ch + "' is not valid in this field");
 
                throw bad_cronexpr(
                   "Invalid character in cron field: " + std::string(text));
@@ -532,12 +580,58 @@ namespace cron
          }
       }
 
+      inline bool has_list_or_range(std::string const & value)
+      {
+         return
+            utils::contains(value, ',') ||
+            utils::contains(value, '-') ||
+            utils::contains(value, '/');
+      }
+
       template <typename Traits>
       static void set_cron_days_of_week(
          std::string value,
-         std::bitset<7>& target)
+         std::bitset<7>& target,
+         day_of_week_options & options)
       {
          auto days = utils::to_upper(value);
+
+         if (days.size() == 1 && days[0] == '?')
+            days[0] = '*';
+
+         // On its own, L means Saturday, as in Quartz. After a weekday it
+         // means the last such weekday of the month, and # selects which one.
+         if (days == "L")
+         {
+            days = std::to_string(Traits::CRON_MAX_DAYS_OF_WEEK);
+         }
+         else if (utils::contains(days, '#') || (!days.empty() && days.back() == 'L'))
+         {
+            if (has_list_or_range(days))
+               throw bad_cronexpr(
+                  "The L and # special characters apply to a single day of week");
+
+            if (days.back() == 'L')
+            {
+               options.last = true;
+               days.pop_back();
+            }
+            else
+            {
+               auto const parts = utils::split(days, '#');
+               if (parts.size() != 2)
+                  throw bad_cronexpr("The # special character must have two fields");
+
+               auto const nth = to_cron_int(parts[1]);
+               if (nth < 1 || nth > 5)
+                  throw bad_cronexpr(
+                     "The # special character must select the 1st to the 5th weekday");
+
+               options.nth = nth;
+               days = parts[0];
+            }
+         }
+
          auto days_replaced = detail::replace_ordinals(
             days,
 #ifdef CRONCPP_IS_CPP17
@@ -547,26 +641,64 @@ namespace cron
 #endif
          );
 
-         if (days_replaced.size() == 1 && days_replaced[0] == '?')
-            days_replaced[0] = '*';
-
          set_cron_field(
             days_replaced,
             target,
             Traits::CRON_MIN_DAYS_OF_WEEK,
             Traits::CRON_MAX_DAYS_OF_WEEK);
+
+         if ((options.nth != 0 || options.last) && target.count() != 1)
+            throw bad_cronexpr(
+               "The L and # special characters apply to a single day of week");
       }
 
       template <typename Traits>
       static void set_cron_days_of_month(
          std::string value,
-         std::bitset<31>& target)
+         std::bitset<31>& target,
+         day_of_month_options & options)
       {
-         if (value.size() == 1 && value[0] == '?')
-            value[0] = '*';
+         auto days = utils::to_upper(value);
+
+         if (days.size() == 1 && days[0] == '?')
+            days[0] = '*';
+
+         if (utils::contains(days, 'L') || utils::contains(days, 'W'))
+         {
+            if (has_list_or_range(days))
+               throw bad_cronexpr(
+                  "The L and W special characters apply to a single day of month");
+
+            if (days == "L")
+            {
+               options.last = true;
+               return;
+            }
+
+            if (days == "LW")
+            {
+               options.last = true;
+               options.nearest_weekday = true;
+               return;
+            }
+
+            if (days.back() != 'W')
+               throw bad_cronexpr("Invalid character in cron field: " + value);
+
+            days.pop_back();
+
+            auto const day = to_cron_int(days);
+            if (day < Traits::CRON_MIN_DAYS_OF_MONTH ||
+                day > Traits::CRON_MAX_DAYS_OF_MONTH)
+               throw bad_cronexpr("Specified range exceeds maximum");
+
+            options.nearest_weekday = true;
+            options.day = day;
+            return;
+         }
 
          set_cron_field(
-            value,
+            days,
             target,
             Traits::CRON_MIN_DAYS_OF_MONTH,
             Traits::CRON_MAX_DAYS_OF_MONTH);
@@ -618,14 +750,24 @@ namespace cron
       // bit 0 is January and day 1 whatever the traits are.
       inline bool has_reachable_date(
          std::bitset<31> const & days_of_month,
-         std::bitset<12> const & months)
+         std::bitset<12> const & months,
+         day_of_month_options const & options)
       {
+         // the last day of a month always exists, whichever month it is
+         if (options.last) return true;
+
          static int const last_day_of[12] =
             { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
          for (size_t month = 0; month < months.size(); ++month)
          {
             if (!months.test(month)) continue;
+
+            if (options.nearest_weekday)
+            {
+               if (static_cast<int>(options.day) <= last_day_of[month]) return true;
+               continue;
+            }
 
             for (size_t day = 0; day < days_of_month.size(); ++day)
             {
@@ -716,6 +858,12 @@ namespace cron
             date.tm_mday = val;
             break;
          case cron_field::month:
+            // Moving to a month shorter than the day currently set would roll
+            // over into the month after it: the 31st of February becomes the
+            // 3rd of March, and the search then misses the month it was aiming
+            // for. The day is searched again from the start of the month
+            // anyway, so begin it at the 1st.
+            date.tm_mday = 1;
             date.tm_mon = val;
             break;
          case cron_field::year:
@@ -829,30 +977,89 @@ namespace cron
          return next_value;
       }
 
+      // The Quartz rule for W: move to the nearest Monday to Friday without
+      // leaving the month, so the 1st on a Saturday moves to the 3rd and the
+      // last day on a Sunday moves two days back. Returns 0 when the day does
+      // not exist in this month at all.
+      inline int nearest_weekday_to(
+         std::tm const & date,
+         int const target,
+         int const last)
+      {
+         if (target < 1 || target > last) return 0;
+
+         int const offset = target - date.tm_mday;
+         int const weekday = ((date.tm_wday + offset) % 7 + 7) % 7;
+
+         if (weekday == 6) return target > 1 ? target - 1 : target + 2;
+         if (weekday == 0) return target < last ? target + 1 : target - 2;
+
+         return target;
+      }
+
+      template <typename Traits>
+      inline bool matches_day_of_month(
+         std::tm const & date,
+         std::bitset<31> const & days_of_month,
+         day_of_month_options const & options)
+      {
+         int const last = days_in_month(date.tm_year + 1900, date.tm_mon);
+
+         if (options.last)
+         {
+            return options.nearest_weekday
+               ? date.tm_mday == nearest_weekday_to(date, last, last)
+               : date.tm_mday == last;
+         }
+
+         if (options.nearest_weekday)
+            return date.tm_mday == nearest_weekday_to(date, options.day, last);
+
+         return days_of_month.test(date.tm_mday - Traits::CRON_MIN_DAYS_OF_MONTH);
+      }
+
+      inline bool matches_day_of_week(
+         std::tm const & date,
+         std::bitset<7> const & days_of_week,
+         day_of_week_options const & options)
+      {
+         if (!days_of_week.test(date.tm_wday)) return false;
+
+         if (options.nth != 0)
+            return (date.tm_mday - 1) / 7 + 1 == options.nth;
+
+         if (options.last)
+            return date.tm_mday + 7 >
+                   days_in_month(date.tm_year + 1900, date.tm_mon);
+
+         return true;
+      }
+
       template <typename Traits>
       static size_t find_next_day(
          std::tm& date,
          std::bitset<31> const & days_of_month,
+         day_of_month_options const & dom_options,
          size_t day_of_month,
          std::bitset<7> const & days_of_week,
-         size_t day_of_week,
+         day_of_week_options const & dow_options,
          std::bitset<7> const & marked_fields)
       {
          unsigned int count = 0;
          unsigned int maximum = 366;
-         // day_of_week comes from std::tm::tm_wday and is always 0 (Sunday) to
-         // 6 (Saturday), whatever the traits are. It is already the bit index,
-         // because the cron value of Sunday is CRON_MIN_DAYS_OF_WEEK and the
-         // bits are set at value - CRON_MIN_DAYS_OF_WEEK.
+         // The matchers read the day straight from date. tm_wday is always
+         // 0 (Sunday) to 6 (Saturday) whatever the traits are, and is already
+         // the bit index, because the cron value of Sunday is
+         // CRON_MIN_DAYS_OF_WEEK and the bits are set at
+         // value - CRON_MIN_DAYS_OF_WEEK.
          while (
-            (!days_of_month.test(day_of_month - Traits::CRON_MIN_DAYS_OF_MONTH) ||
-            !days_of_week.test(day_of_week))
+            !(matches_day_of_month<Traits>(date, days_of_month, dom_options) &&
+              matches_day_of_week(date, days_of_week, dow_options))
             && count++ < maximum)
          {
             add_to_field(date, cron_field::day_of_month, 1);
 
             day_of_month = date.tm_mday;
-            day_of_week = date.tm_wday;
 
             reset_all_fields(date, marked_fields);
          }
@@ -926,14 +1133,14 @@ namespace cron
             if (!res) return res;
          }
 
-         unsigned int day_of_week = date.tm_wday;
          unsigned int day_of_month = date.tm_mday;
          auto updated_day_of_month = find_next_day<Traits>(
             date,
             cex.days_of_month,
+            cex.dom_options,
             day_of_month,
             cex.days_of_week,
-            day_of_week,
+            cex.dow_options,
             marked_fields);
          if (day_of_month == updated_day_of_month)
          {
@@ -1037,16 +1244,16 @@ namespace cron
       detail::set_cron_field(fields[1], cex.minutes, Traits::CRON_MIN_MINUTES, Traits::CRON_MAX_MINUTES);
       detail::set_cron_field(fields[2], cex.hours, Traits::CRON_MIN_HOURS, Traits::CRON_MAX_HOURS);
 
-      detail::set_cron_days_of_week<Traits>(fields[5], cex.days_of_week);
+      detail::set_cron_days_of_week<Traits>(fields[5], cex.days_of_week, cex.dow_options);
 
-      detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month);
+      detail::set_cron_days_of_month<Traits>(fields[3], cex.days_of_month, cex.dom_options);
 
       detail::set_cron_month<Traits>(fields[4], cex.months);
 
       // A date such as the 31st of February never arrives, so there is no
       // next occurrence to compute and the expression is rejected here rather
       // than leaving the caller to make sense of a search that never succeeds.
-      if (!detail::has_reachable_date(cex.days_of_month, cex.months))
+      if (!detail::has_reachable_date(cex.days_of_month, cex.months, cex.dom_options))
          throw bad_cronexpr("Date specified by the expression is invalid");
 
       cex.expr = expr;
