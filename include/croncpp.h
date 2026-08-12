@@ -1566,4 +1566,120 @@ namespace cron
       return std::chrono::time_point_cast<Duration>(
          std::chrono::system_clock::from_time_t(next));
    }
+
+   // The last time matching the expression that is strictly earlier than the
+   // one given, the counterpart of cron_next.
+   //
+   // It is answered with repeated cron_next calls rather than a search running
+   // backwards, so that it inherits the behaviour of the forward search rather
+   // than restating it in mirror image. cron_next is monotonic, so "the next
+   // occurrence is still earlier than the time asked about" holds for every
+   // instant up to the answer and for none after it, and the boundary between
+   // the two can be found by halving an interval.
+   //
+   // The interval starts as the smallest of a minute, an hour, a day, a month,
+   // a year and the four year search horizon that contains an occurrence at
+   // all. That costs one call per size tried, and bounds what the halving then
+   // has to cover.
+   //
+   // The total is at most six probes, twenty seven halvings of the four year
+   // interval and one final lookup, so thirty four calls; an expression firing
+   // every second is answered in eight. The count follows the width of the
+   // interval rather than the number of occurrences inside it, so an
+   // expression firing every second of a single day costs no more than one
+   // firing once a year.
+   template <typename Traits = cron_standard_traits>
+   static std::time_t cron_prev(cronexpr const & cex, std::time_t const & date)
+   {
+      if (cex.empty())
+         throw bad_cronexpr("Invalid empty cron expression");
+
+      static std::time_t const windows[] =
+      {
+         60,                   // a minute
+         60 * 60,              // an hour
+         24 * 60 * 60,         // a day
+         31 * 24 * 60 * 60,    // a month
+         366 * 24 * 60 * 60,   // a year
+         4 * 366 * 24 * 60 * 60
+      };
+
+      std::time_t low = 0;
+      bool bracketed = false;
+
+      for (size_t i = 0; i < sizeof(windows) / sizeof(windows[0]); ++i)
+      {
+         // do not reach back past what a std::time_t can hold
+         if (date < (std::numeric_limits<std::time_t>::min)() + windows[i]) continue;
+
+         std::time_t const start = date - windows[i];
+         std::time_t const first = cron_next<Traits>(cex, start);
+
+         if (INVALID_TIME != first && first < date)
+         {
+            low = start;
+            bracketed = true;
+            break;
+         }
+      }
+
+      if (!bracketed) return INVALID_TIME;
+
+      // Narrow to the last instant whose next occurrence is still earlier than
+      // the time asked about. The occurrence after that instant is the answer.
+      std::time_t high = date;
+      while (high - low > 1)
+      {
+         std::time_t const middle = low + (high - low) / 2;
+         std::time_t const next = cron_next<Traits>(cex, middle);
+
+         if (INVALID_TIME != next && next < date) low = middle;
+         else                                     high = middle;
+      }
+
+      std::time_t const result = cron_next<Traits>(cex, low);
+
+      return (INVALID_TIME != result && result < date) ? result : INVALID_TIME;
+   }
+
+   template <typename Traits = cron_standard_traits>
+   static std::tm cron_prev(cronexpr const & cex, std::tm date)
+   {
+      std::time_t const original = utils::tm_to_time(date);
+      if (INVALID_TIME == original) return {};
+
+      std::time_t const result = cron_prev<Traits>(cex, original);
+      if (INVALID_TIME == result) return {};
+
+      std::tm out;
+      if (utils::time_to_tm(&result, &out) == nullptr) return {};
+
+      return out;
+   }
+
+   template <typename Traits = cron_standard_traits, typename Duration>
+   static std::chrono::time_point<std::chrono::system_clock, Duration> cron_prev(
+      cronexpr const & cex,
+      std::chrono::time_point<std::chrono::system_clock, Duration> const & time_point)
+   {
+      using result_type =
+         std::chrono::time_point<std::chrono::system_clock, Duration>;
+
+      auto const from = std::chrono::time_point_cast<
+         std::chrono::system_clock::duration>(time_point);
+
+      // An occurrence at the truncated second is still earlier than a time
+      // point carrying a fraction of one, so round the input up before asking.
+      auto tt = std::chrono::system_clock::to_time_t(from);
+      if (std::chrono::system_clock::from_time_t(tt) < from) {
+         ++tt;
+      }
+
+      auto const previous = cron_prev<Traits>(cex, tt);
+
+      if (INVALID_TIME == previous) return (result_type::min)();
+
+      return std::chrono::time_point_cast<Duration>(
+         std::chrono::system_clock::from_time_t(previous));
+   }
 }
