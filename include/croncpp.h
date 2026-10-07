@@ -12,7 +12,13 @@
 #include <limits>
 #include <type_traits>
 
-#if __cplusplus > 201402L
+#if defined(_MSVC_LANG)
+#define CRONCPP_CPLUSPLUS _MSVC_LANG
+#else
+#define CRONCPP_CPLUSPLUS __cplusplus
+#endif
+
+#if CRONCPP_CPLUSPLUS > 201402L
 #include <string_view>
 #define CRONCPP_IS_CPP17
 #endif
@@ -375,7 +381,7 @@ namespace cron
       inline std::tm to_tm(CRONCPP_STRING_VIEW time)
       {
          std::tm result;
-#if __cplusplus > 201103L
+#if CRONCPP_CPLUSPLUS > 201103L
          std::istringstream str(time.data());
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
 
@@ -403,7 +409,7 @@ namespace cron
 
       inline std::string to_string(std::tm const & tm)
       {
-#if __cplusplus > 201103L
+#if CRONCPP_CPLUSPLUS > 201103L
          std::ostringstream str;
          str.imbue(std::locale(setlocale(LC_ALL, nullptr)));
          str << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
